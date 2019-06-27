@@ -91,7 +91,7 @@ To get started, simply clone this repository and start editing the
 code.
 
 Once you are ready to submit, please submit a Pull Request via GitHub
-a description of the changes you have made.
+with a description of the changes you have made.
 
 # 🚀 Testing and Running Your Code
 
@@ -107,12 +107,12 @@ mvn clean install
 java -jar target/todo-1.0-SNAPSHOT.jar server config.yml
 ```
 
-This will run the server on http://localhost:8080
+This will run the server on http://localhost:8080.
 
 **Database**
 
-We have included a docker-compose to start your own PostgreSQL instance
-locally.
+We have included a docker-compose.yml to help start your
+own PostgreSQL instance locally.
 
 Make sure you have Docker installed. Then, run:
 
@@ -120,7 +120,10 @@ Make sure you have Docker installed. Then, run:
 docker-compose up -d
 ```
 
-This will start your PostgreSQL instance.
+This will start a local PostgreSQL instance.
+
+The application's config.yml is already configured with
+the default database credentials.
 
 # ❓ Help
 
