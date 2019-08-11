@@ -9,28 +9,34 @@ import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
 
 public class TodoConfiguration extends Configuration {
+// TODO: look at how to possibly validate these members
 
   @Valid
   @NotNull
-  private DataSourceFactory database = new DataSourceFactory();
+  private DataSourceFactory dataSourceFactory = new DataSourceFactory();
 
   @Valid
   @NotNull
   @JsonProperty("httpClient")
   private HttpClientConfiguration httpClient = new HttpClientConfiguration();
 
+  // TODO: HealthCheck here? -- Where/how is this used?
+  @NotNull
   public HttpClientConfiguration getHttpClientConfiguration() {
     return httpClient;
   }
 
+  // TODO: HealthCheck here?
   @JsonProperty("database")
   public void setDataSourceFactory(DataSourceFactory factory) {
-    this.database = factory;
+    this.dataSourceFactory = factory;
   }
 
+  // TODO: perhaps rename to 'getDataSource'
+  @NotNull
   @JsonProperty("database")
   public DataSourceFactory getDataSourceFactory() {
-    return database;
+    return dataSourceFactory;
   }
 
 }

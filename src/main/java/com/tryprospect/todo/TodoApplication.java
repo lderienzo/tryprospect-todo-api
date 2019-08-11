@@ -1,9 +1,11 @@
 package com.tryprospect.todo;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.tryprospect.todo.db.Todos;
+import com.tryprospect.todo.db.TodoDAO;
+import com.tryprospect.todo.container.StatusFilterFeature;
 import com.tryprospect.todo.lifecycle.ManagedFlywayMigration;
-import com.tryprospect.todo.api.TodoResource;
+import com.tryprospect.todo.resources.TodoResource;
+
 import io.dropwizard.Application;
 import io.dropwizard.configuration.EnvironmentVariableSubstitutor;
 import io.dropwizard.configuration.SubstitutingSourceProvider;
@@ -48,12 +50,15 @@ public class TodoApplication extends Application<TodoConfiguration> {
         Jdbi jdbi = factory.build(environment, dataSourceFactory, "postgresql");
 
         // DAOs
-        Todos todos = jdbi.onDemand(Todos.class);
+        TodoDAO todoDAO = jdbi.onDemand(TodoDAO.class);
 
         // Resources
-        environment.jersey().register(new TodoResource(todos));
+        environment.jersey().register(new TodoResource(todoDAO));
 
-        // Misc
+        // Filters
+        environment.jersey().register(StatusFilterFeature.class);
+
+        // Misc TODO: what is this? and what is it for?
         environment.getObjectMapper().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 

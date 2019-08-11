@@ -8,6 +8,7 @@ httpClient:
   connectionTimeout: 10s
 
 server:
+  rootPath: /tryprospect/todo-api/*
   applicationConnectors:
     - type: http
       port: 8080
