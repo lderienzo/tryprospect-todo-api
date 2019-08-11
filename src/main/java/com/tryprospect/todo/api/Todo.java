@@ -1,7 +1,5 @@
 package com.tryprospect.todo.api;
 
-import static com.tryprospect.todo.validation.Messages.TODO_VALIDATION_ERROR_TEXT;
-
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -17,23 +15,11 @@ import org.hibernate.validator.constraints.NotBlank;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Strings;
+import com.tryprospect.todo.annotations.PresentOrPast;
 
 import lombok.Data;
 
 
-/*
-
-If task marked as completed, and due date has also been changed/is present, remove value for due date.
-If task marked as completed, and text has also been changed, save the changed text.
-
-Note to self -- Plan:
-Make a class / group ? validator to validate/govern the above isCompleted/dueDate relationship.
-If isCompleted == TRUE && dueDate is NotEmpty
-Then
-  raise constraint violation. Due date can not be populated if is completed marked "true".
-  Due date "may" only have a value if is completed is "false".
-  Due date can be empty and iscompleted can be "false"
- */
 @Data
 public final class Todo {
 
@@ -46,12 +32,10 @@ public final class Todo {
   @NotNull
   private final Boolean isCompleted;
 
-  @NotNull
-//  @Past -- Create Custom Annotation to PastOrPrezent
-  private final Date createdAt; // TODO: should be LocalDateTime
+  @PresentOrPast
+  private final Date createdAt; // TODO: Big priority -- should be LocalDateTime
 
-  @NotNull
-//  @Past
+  @PresentOrPast
   private final Date lastModifiedAt;
 
   @Future

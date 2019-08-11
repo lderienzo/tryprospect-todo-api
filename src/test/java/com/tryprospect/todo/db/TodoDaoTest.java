@@ -115,10 +115,6 @@ public class TodoDaoTest {
         assertThat(removeSeconds(actualTodo.getLastModifiedAt())).isEqualTo(expectedLastModifiedAt);
     }
 
-    private Date lastModifiedNow() {
-        return Date.from(Clock.systemDefaultZone().instant());
-    }
-
     private String removeSeconds(Date dateToFormat) {
         return DATE_FORMAT.format(dateToFormat);
     }
