@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -45,7 +46,6 @@ public class TodoDaoTest {
 //            .build();
 
     public static final PostgreSQLContainer POSTGRES = TodoDaoTestConfiguration.getRunningInstanceOfPostgres();
-
     private static final DataSourceFactory DATA_SOURCE_FACTORY = TodoDaoTestConfiguration.getDataSourceFactory(POSTGRES);
     private static final Flyway FLYWAY = TodoDaoTestConfiguration.getFlywayDbMigrationObject(DATA_SOURCE_FACTORY);
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm");
@@ -53,13 +53,15 @@ public class TodoDaoTest {
     private static final HealthCheckRegistry HEALTH_CHECKS = mock(HealthCheckRegistry.class);
     private static final MetricRegistry METRIC_REGISTRY = new MetricRegistry();
     private static final Environment ENVIRONMENT = mock(Environment.class);
-    private static final String TODO_TEXT = "test todo text";
+    private static final String TODO_TEXT = "Test todo text.";
+    private static final String MODIFIED_TODO_TEXT = TODO_TEXT + " Plus something else.";
     private static TodoDAO todoDAO;
     private List<Todo> expectedTodos;
     private List<Todo> actualTodos;
 
     @BeforeAll
     public static void setUp() {
+        containerHealthCheck();
         initializeTodoDAO();
     }
 
@@ -80,16 +82,20 @@ public class TodoDaoTest {
         return new JdbiFactory().build(ENVIRONMENT, DATA_SOURCE_FACTORY, geSqlContainerName());
     }
 
+    private static TodoDAO getTodoDaoFromJdbiObject(Jdbi jdbi) {
+        return jdbi.onDemand(TodoDAO.class);
+    }
+
+    private static void containerHealthCheck() {
+        assertThat(POSTGRES.isRunning()).isTrue();
+    }
+
     private static String geSqlContainerName() {
         return getPostgresContainerMemberField().getName();
     }
 
     private static Field getPostgresContainerMemberField() {
         return TodoDaoTest.class.getFields()[0];
-    }
-
-    private static TodoDAO getTodoDaoFromJdbiObject(Jdbi jdbi) {
-        return jdbi.onDemand(TodoDAO.class);
     }
 
     @BeforeEach
@@ -103,28 +109,23 @@ public class TodoDaoTest {
     }
 
     @Test
-    public void containerHealthCheck() {
-        assertThat(POSTGRES.isRunning()).isTrue();
-    }
-
-    @Test
-    public void testInsert_successWhenNonNullStringPassed() {
+    public void testInsert_whenNonEmptyTextThenNewTodoCreated() {
         // given
-        Date expectedCreatedDateOfNow = Date.from(Clock.systemDefaultZone().instant());
-        String expectedCreatedAt = DATE_FORMAT.format(expectedCreatedDateOfNow);
-        String expectedLastModifiedAtString = expectedCreatedAt;
-
+        Date expectedLastModifiedDate = lastModifiedNow();
+        String expectedLastModifiedAt = removeSeconds(expectedLastModifiedDate);
+        String expectedCreatedAt = expectedLastModifiedAt;
         // when
-        Todo actualTodo = todoDAO.insert(TODO_TEXT);
-        String actualTodoCreatedAt = DATE_FORMAT.format(actualTodo.getCreatedAt());
-        String actualTodoLastModifiedAt = DATE_FORMAT.format(actualTodo.getLastModifiedAt());
-
+        Todo actualTodo = createTodo(TODO_TEXT);
         // then
         assertThat(actualTodo.getCompleted()).isFalse();
         assertThat(actualTodo.getText()).isEqualTo(TODO_TEXT);
         assertThat(idIsValidUuid(actualTodo.getId().toString())).isTrue();
         assertThat(removeSeconds(actualTodo.getCreatedAt())).isEqualTo(expectedCreatedAt);
         assertThat(removeSeconds(actualTodo.getLastModifiedAt())).isEqualTo(expectedLastModifiedAt);
+    }
+
+    private Date lastModifiedNow() {
+        return Date.from(Clock.systemDefaultZone().instant());
     }
 
     private String removeSeconds(Date dateToFormat) {
@@ -136,9 +137,9 @@ public class TodoDaoTest {
     }
 
     @Test
-    public void testInsert_failureAsExceptionWhenNullStringPassed() {
+    public void testInsert_whenTextIsNullThenException() {
         Assertions.assertThrows(UnableToExecuteStatementException.class, () ->
-            todoDAO.insert(null)
+            createTodo(null)
         );
     }
 
@@ -162,20 +163,18 @@ public class TodoDaoTest {
     }
 
     @Test
-    public void testFindAll_allFound() {
+    public void testFindAll_whenTodosPresentThenAllFound() {
         // given
         expectedTodos = addThreeTodos();
-
         // when
         actualTodos = todoDAO.findAll();
-
         // then
         assertThatAllAddedTodosWhereFound();
     }
 
     private List<Todo> addThreeTodos() {
         return IntStream.range(1, 4)
-                .mapToObj(i -> todoDAO.insert("test todo " + i + " text"))
+                .mapToObj(i -> createTodo("test todo " + i + " text"))
                 .collect(toList());
     }
 
@@ -185,64 +184,198 @@ public class TodoDaoTest {
     }
 
     @Test
-    public void testFindAll_noneFound() {
+    public void testFindAll_whenTodosNotPresentThenNoneFound() {
         // given
         expectedTodos = Collections.emptyList();
-
         // when
         actualTodos = todoDAO.findAll();
-
         // then
         assertThat(actualTodos).isEqualTo(expectedTodos);
     }
 
     @Test
-    public void testFindById_todoFound() {
+    public void testFindById_whenValidIdPassedThenFound() {
         // given
-        Todo todoToFind = todoDAO.insert("test todo text");
-
+        Todo todoToFind = createTodo(TODO_TEXT);
         // when
         Optional<Todo> todoFound = todoDAO.findById(todoToFind.getId());
-
         // then
         assertThat(todoFound.get().toString()).isEqualTo(todoToFind.toString());
     }
 
     @Test
-    public void testFindById_todoNotFound() throws IOException {
+    public void testFindById_whenInvalidIdPassedThenNothingFound() throws IOException {
         // given
         Todo todoToFind = TestUtils.createTestTodoFromJson();
-
         // when
         Optional<Todo> todoFound = todoDAO.findById(todoToFind.getId());
-
         // then
         assertThat(todoFound.isPresent()).isFalse();
     }
 
+    @Test
+    public void testUpdate_whenTextChangedThenValueProperlySaved() {
+        // given
+        Todo newTodo = createTodo(TODO_TEXT);
+        Todo expectedTodo = copyCreateTodoChangingTextAndLastModified(newTodo);
+        // when
+        todoDAO.update(expectedTodo);
+        // then
+        checkUpdateComparingLastModifedSeparately(expectedTodo);
+    }
+
+    private Todo copyCreateTodoChangingTextAndLastModified(Todo expectedTodo) {
+        return new Todo(expectedTodo.getId().toString(), MODIFIED_TODO_TEXT, Boolean.FALSE,
+                expectedTodo.getCreatedAt(), lastModifiedNow(), null);
+    }
+
+    private void checkUpdateComparingLastModifedSeparately(Todo expectedTodo) {
+        Todo updatedTodo = todoDAO.findById(expectedTodo.getId()).get();
+        assertThat(updatedTodo).isEqualToIgnoringGivenFields(expectedTodo, "lastModifiedAt");
+        assertThat(removeSeconds(updatedTodo.getLastModifiedAt())).isEqualTo(removeSeconds(expectedTodo.getCreatedAt()));
+    }
 
     @Test
-    public void testDeleteById_existingTodo() {
+    public void testUpdate_whenDueDateChangedThenValueProperlySaved() {
         // given
-        Todo todoToDelete = todoDAO.insert("test todo text");
+        Todo newTodo = createTodo(TODO_TEXT);
+        Todo expectedTodo = copyCreateTodoChangingDueDateAndLastModified(newTodo);
+        // when
+        todoDAO.update(expectedTodo);
+        // then
+        checkUpdateComparingLastModifedAndDueDateSeparately(expectedTodo);
+    }
 
+    private void checkUpdateComparingLastModifedAndDueDateSeparately(Todo expectedTodo) {
+        Todo updatedTodo = todoDAO.findById(expectedTodo.getId()).get();
+        assertThat(updatedTodo).isEqualToIgnoringGivenFields(expectedTodo, "lastModifiedAt", "dueDate");
+        assertThat(removeSeconds(updatedTodo.getLastModifiedAt())).isEqualTo(removeSeconds(expectedTodo.getCreatedAt()));
+        assertThat(removeSeconds(updatedTodo.getDueDate())).isEqualTo(removeSeconds(expectedTodo.getDueDate()));
+    }
+
+    private Todo copyCreateTodoChangingDueDateAndLastModified(Todo expectedTodo) {
+        return new Todo(expectedTodo.getId().toString(), expectedTodo.getText(), Boolean.FALSE,
+                expectedTodo.getCreatedAt(), lastModifiedNow(),
+                createDueDateOfOneMonthFromCreationDate(expectedTodo.getCreatedAt()));
+    }
+
+    @Test
+    public void testUpdate_whenIsCompletedChangedThenValueProperlySaved() {
+        // given
+        Todo newTodo = createTodo(TODO_TEXT);
+        Todo expectedTodo = copyCreateTodoChangingIsCompletedAndLastModified(newTodo);
+        // when
+        todoDAO.update(expectedTodo);
+        // then
+        checkUpdateComparingLastModifedSeparately(expectedTodo);
+    }
+
+    private Todo copyCreateTodoChangingIsCompletedAndLastModified(Todo expectedTodo) {
+        return new Todo(expectedTodo.getId().toString(), expectedTodo.getText(), Boolean.TRUE,
+                expectedTodo.getCreatedAt(), lastModifiedNow(), null);
+    }
+
+    @Test
+    public void testUpdate_whenIsCompletedAndTextChangedThenValueProperlySaved() {
+        // given
+        Todo newTodo = createTodo(TODO_TEXT);
+        Todo expectedTodo = copyCreateTodoChangingIsCompletedTextAndLastModified(newTodo);
+        // when
+        todoDAO.update(expectedTodo);
+        // then
+        checkUpdateComparingLastModifedSeparately(expectedTodo);
+    }
+
+    private Todo copyCreateTodoChangingIsCompletedTextAndLastModified(Todo expectedTodo) {
+        return new Todo(expectedTodo.getId().toString(), MODIFIED_TODO_TEXT, Boolean.TRUE,
+                expectedTodo.getCreatedAt(), lastModifiedNow(), null);
+    }
+
+    @Test
+    public void testUpdate_whenDueDateAndTextChangedThenValueProperlySaved() {
+        // given
+        Todo newTodo = createTodo(TODO_TEXT);
+        Todo expectedTodo = copyCreateTodoChangingDueDateTextAndLastModified(newTodo);
+        // when
+        todoDAO.update(expectedTodo);
+        // then
+        checkUpdateComparingLastModifedAndDueDateSeparately(expectedTodo);
+    }
+
+    private Todo copyCreateTodoChangingDueDateTextAndLastModified(Todo expectedTodo) {
+        return new Todo(expectedTodo.getId().toString(), MODIFIED_TODO_TEXT, Boolean.FALSE,
+                expectedTodo.getCreatedAt(), lastModifiedNow(),
+                createDueDateOfOneMonthFromCreationDate(expectedTodo.getCreatedAt()));
+    }
+
+    private Date createDueDateOfOneMonthFromCreationDate(Date createdAt) {
+        LocalDate createdAtLocalDate = new java.sql.Date(createdAt.getTime()).toLocalDate();
+        createdAtLocalDate.plusMonths(1L);
+        return java.sql.Date.valueOf(createdAtLocalDate);
+    }
+
+    @Test
+    public void testUpdate_whenDueDateAndIsCompletedChangedThenValueProperlySaved() {
+        // given
+        Todo newTodo = createTodo(TODO_TEXT);
+        Todo expectedTodo = copyCreateTodoChangingDueDateIsCompletedAndLastModified(newTodo);
+        // when
+        todoDAO.update(expectedTodo);
+        // then
+        checkUpdateComparingLastModifedAndDueDateSeparately(expectedTodo);
+    }
+
+    private Todo copyCreateTodoChangingDueDateIsCompletedAndLastModified(Todo expectedTodo) {
+        return new Todo(expectedTodo.getId().toString(), expectedTodo.getText(), Boolean.TRUE,
+                expectedTodo.getCreatedAt(), lastModifiedNow(),
+                createDueDateOfOneMonthFromCreationDate(expectedTodo.getCreatedAt()));
+    }
+
+    @Test
+    public void testUpdate_whenDueDateIsCompletedAndTextChangedThenValueProperlySaved() {
+        // given
+        Todo newTodo = createTodo(TODO_TEXT);
+        Todo expectedTodo = copyCreateTodoChangingDueDateIsCompletedTextAndLastModified(newTodo);
+        // when
+        todoDAO.update(expectedTodo);
+        // then
+        checkUpdateComparingLastModifedAndDueDateSeparately(expectedTodo);
+    }
+
+    private Todo copyCreateTodoChangingDueDateIsCompletedTextAndLastModified(Todo expectedTodo) {
+        return new Todo(expectedTodo.getId().toString(), MODIFIED_TODO_TEXT, Boolean.TRUE,
+                expectedTodo.getCreatedAt(), lastModifiedNow(),
+                createDueDateOfOneMonthFromCreationDate(expectedTodo.getCreatedAt()));
+    }
+
+    @Test
+    public void testUpdate_whenOnlyLastModifiedChangedThenValueProperlySaved() {
+        // given
+        Todo newTodo = createTodo(TODO_TEXT);
+        Todo expectedTodo = newTodo;
+        // when
+        todoDAO.update(expectedTodo);
+        // then
+        checkUpdateComparingLastModifedSeparately(expectedTodo);
+    }
+
+    @Test
+    public void testDeleteById_whenValidIdThenDeleted() {
+        // given
+        Todo todoToDelete = createTodo(TODO_TEXT);
         // when
         todoDAO.deleteById(todoToDelete.getId());
-
         // then
         Optional<Todo> deletedTodo = todoDAO.findById(todoToDelete.getId());
         assertThat(deletedTodo.isPresent()).isFalse();
     }
 
-
     @Test
-    public void testDeleteById_nonExistingTodo() throws IOException {
+    public void testDeleteById_whenInvalidIdThenNothingDeleted() throws IOException {
         // given
         Todo todoToDelete = TestUtils.createTestTodoFromJson();
-
         // when
         todoDAO.deleteById(todoToDelete.getId());
-
         // then
         Optional<Todo> deletedTodo = todoDAO.findById(todoToDelete.getId());
         assertThat(deletedTodo.isPresent()).isFalse();

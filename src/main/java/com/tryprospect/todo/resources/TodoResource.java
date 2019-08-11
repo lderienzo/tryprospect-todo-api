@@ -1,29 +1,23 @@
 package com.tryprospect.todo.resources;
 
 
-import static com.tryprospect.todo.validation.Messages.NULL_LIST_OF_TODOS_RETURNED_ERROR;
+import static com.tryprospect.todo.validation.ValidationMessages.*;
 
 import com.tryprospect.todo.annotations.Status;
+import com.tryprospect.todo.annotations.ValidForUpdate;
 import com.tryprospect.todo.api.Todo;
 import com.tryprospect.todo.db.TodoDAO;
-import com.tryprospect.todo.validation.Messages;
-import com.tryprospect.todo.validation.annotations.CheckUuid;
+import com.tryprospect.todo.validation.ValidationMessages;
 
+import javax.validation.Valid;
 import javax.validation.constraints.NotNull;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
-import javax.ws.rs.GET;
-import javax.ws.rs.POST;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
+import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 import org.hibernate.validator.constraints.NotBlank;
+
 
 /*
 The web layer is the uppermost layer of a web application.
@@ -43,19 +37,27 @@ public class TodoResource {
 
   private final TodoDAO todoDAO;
 
+
   public TodoResource(TodoDAO todoDAO) {
     this.todoDAO = todoDAO;
   }
 
   @POST
-  @NotNull(message = Messages.NULL_TODO_RETURNED_ERROR)
+  @Valid
   @Status(Status.CREATED)
-  public Todo createTodo(@NotBlank(message = Messages.TODO_VALIDATION_ERROR) String newTodoText) {
+  @NotNull(message = ValidationMessages.NULL_TODO_RETURNED_ERROR_MSG_KEY)
+  public Todo createTodo(@NotBlank(message = CREATE_TODO_VALIDATION_ERROR_MSG_KEY) String newTodoText) {
     return todoDAO.insert(newTodoText);
   }
 
+  @PUT
+  @Path("/{id}")
+  public void updateTodo(@ValidForUpdate @Valid Todo todo) {
+     todoDAO.update(todo);
+  }
+
   @GET
-  @NotNull(message = NULL_LIST_OF_TODOS_RETURNED_ERROR)  // TODO: put in properties file?
+  @NotNull(message = NULL_LIST_OF_TODOS_RETURNED_ERROR_MSG_KEY)
   public List<Todo> getTodos() {
     return todoDAO.findAll();
   }

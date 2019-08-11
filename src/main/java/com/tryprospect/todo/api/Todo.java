@@ -28,6 +28,7 @@ public final class Todo {
   private final Boolean isCompleted;
   private final Date createdAt; // TODO: should be LocalDateTime
   private final Date lastModifiedAt;
+  private final Date dueDate;
 
   public Todo(){
     this.id = null;
@@ -35,6 +36,7 @@ public final class Todo {
     this.isCompleted = Boolean.FALSE;
     this.createdAt = null;
     this.lastModifiedAt = null;
+    this.dueDate = null;
   }
 
   @JsonCreator
@@ -42,21 +44,23 @@ public final class Todo {
               @JsonProperty("text") String text,
               @JsonProperty("is_completed") Boolean isCompleted,
               @JsonProperty("created_at") Date createdAt,
-              @JsonProperty("last_modified_at") Date lastModifiedAt) {
+              @JsonProperty("last_modified_at") Date lastModifiedAt,
+              @JsonProperty("due_date") Date dueDate) {
 
+    this.id = UUID.fromString(id);
     this.text = text;
     this.isCompleted = isCompleted;
     this.createdAt = createdAt;
     this.lastModifiedAt = lastModifiedAt;
-    this.id = UUID.fromString(id);
+    this.dueDate = dueDate;
 
 //    this.createdAt = convertToLocalDateTime(createdAt);
 //    this.lastModifiedAt = convertToLocalDateTime(lastModifiedAt);
   }
 
-//  private LocalDateTime convertToLocalDateTime(Date dateToConvert) {
-//    return convertViaMilliseconds(dateToConvert);
-//  }
+  private LocalDateTime convertToLocalDateTime(Date dateToConvert) {
+    return convertViaMilliseconds(dateToConvert);
+  }
 
   private LocalDateTime convertViaMilliseconds(Date dateToConvert) {
     return Instant.ofEpochMilli(dateToConvert.getTime())
@@ -87,5 +91,11 @@ public final class Todo {
   @JsonProperty("last_modified_at")
   public Date getLastModifiedAt() {
     return lastModifiedAt;
+  }
+
+
+  @JsonProperty("due_date")
+  public Date getDueDate() {
+    return dueDate;
   }
 }

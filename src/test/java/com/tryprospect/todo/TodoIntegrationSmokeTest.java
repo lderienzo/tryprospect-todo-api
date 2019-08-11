@@ -1,5 +1,7 @@
 package com.tryprospect.todo;
 
+import static com.tryprospect.todo.utils.TestTodoCreator.copyCreateNewTodoWithIsCompletedTrue;
+import static com.tryprospect.todo.utils.TestTodoCreator.copyCreateTodoWithDueDateValue;
 import static org.assertj.core.api.Java6Assertions.assertThat;
 
 import java.net.URI;
@@ -47,8 +49,10 @@ public class TodoIntegrationSmokeTest {
     private static URI relativeUri;
     private static URI relativeUriWithId;
     private static Todo todo;
+    private static Todo updatedTodo;
     private static final String NEW_TODO_TEXT = "some new todo text";
     private static final String NEW_TODO_IS_NULL_MSG = "New Todo is null.";
+    private static final String UPDATED_TODO_IS_NULL_MSG = "Updated Todo is null.";
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm");
     // TODO: figure out a way to perhaps use the main test-config.yml file. This statement references a copy in the tes resources folder.
     private static final String CONFIG_PATH = ResourceHelpers.resourceFilePath("test-config.yml");
@@ -160,6 +164,53 @@ public class TodoIntegrationSmokeTest {
 
     @Test
     @Order(4)
+    public void testUpdateTodo() {
+        Preconditions.notNull(todo, NEW_TODO_IS_NULL_MSG);
+        // given
+        Todo todoToUpdate = copyCreateTodoWithDueDateValue(todo);
+        // when
+        Response response = makeRequestToUpdateTodo(relativeUriWithId, todoToUpdate);
+        // then
+        Assertions.assertThat(response.getStatus()).isEqualTo(HttpStatus.NO_CONTENT_204);
+
+        prepareForNextTestByAssigningUpdatedTodo(todoToUpdate);
+    }
+
+    private Response makeRequestToUpdateTodo(URI relativeUri, Todo todoToUpdate) {
+        URI absoluteUri = buildAbsoluteUriWithRelative(relativeUri);
+        return makeRequest(absoluteUri).put(Entity.entity(todoToUpdate, MediaType.APPLICATION_JSON_TYPE));
+    }
+
+    private void prepareForNextTestByAssigningUpdatedTodo(Todo todo) {
+        updatedTodo = todo;
+    }
+
+    @Test
+    @Order(5)
+    public void checkTodoWasUpdated() {
+        // given
+        Preconditions.notNull(updatedTodo, UPDATED_TODO_IS_NULL_MSG);
+        // when
+        Optional<Todo> actualTodoOptional = makeGetRequestToReturnTodo(relativeUriWithId);
+        // then
+        assertThat(actualTodoOptional.isPresent()).isTrue();
+        assertThat(actualTodoOptional.get()).isEqualToComparingFieldByField(updatedTodo);
+    }
+
+    @Test
+    @Order(6)
+    public void testUpdateTodo_whenIsCompletedTrueAndValueForDueDateThen422Error() {
+        Preconditions.notNull(updatedTodo, NEW_TODO_IS_NULL_MSG);
+        // given
+        Todo todoToUpdate = copyCreateNewTodoWithIsCompletedTrue(updatedTodo);
+        // when
+        Response response = makeRequestToUpdateTodo(relativeUriWithId, todoToUpdate);
+        // then
+        Assertions.assertThat(response.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY_422);
+    }
+
+    @Test
+    @Order(7)
     public void testDeleteTodo() {
         // given/when
         Response response = makeRequestToDeleteTodo(relativeUriWithId);

@@ -1,0 +1,21 @@
+logging:
+  level: INFO
+  loggers:
+    com.tryprospect: DEBUG
+
+httpClient:
+  timeout: 10s
+  connectionTimeout: 10s
+
+server:
+  rootPath: /*
+  applicationConnectors:
+    - type: http
+      port: 8080
+  adminConnectors: []
+
+database:
+  driverClass: org.postgresql.Driver
+  user: postgres
+  password: postgres
+  url: jdbc:postgresql://localhost:5432/postgres

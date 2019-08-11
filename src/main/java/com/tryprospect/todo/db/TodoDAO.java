@@ -3,7 +3,6 @@ package com.tryprospect.todo.db;
 import org.jdbi.v3.sqlobject.config.RegisterFieldMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindBean;
-import org.jdbi.v3.sqlobject.customizer.BindFields;
 import org.jdbi.v3.sqlobject.statement.GetGeneratedKeys;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
@@ -44,28 +43,11 @@ public interface TodoDAO {
   @SqlQuery("SELECT * FROM todo WHERE id = :id")
   Optional<Todo> findById(@Bind("id") UUID id);
 
-//  @SqlUpdate("DELETE FROM todo")  / * BUG HERE */
+  // TODO: see if we can use something like:   "update mybeans set <if(a)>a = :a,<endif> <if(b)>b = :b,<endif> modified=now() where id=:id"
+  @SqlUpdate("UPDATE todo set text = :t.text, is_completed = :t.isCompleted, due_date = :t.dueDate where id = :t.id")
+  void update(@BindBean("t") Todo todo);
+
+  //  @SqlUpdate("DELETE FROM todo")  / * BUG HERE */
   @SqlUpdate("DELETE FROM todo WHERE id = :id")
   void deleteById(@Bind("id") UUID id);
-
-
-
-
-  // TODO -- The Enhancement
-  // TODO: Add field for "due date"
-//  @SqlUpdate("UPDATE todo set text = :s.text, is_completed = :s.isCompleted, due_date = :s.dueDate where id = :s.id")
-  /*
-  can only update text, dueDate, or isCompleted.
-  dueDate and isCompleted look like they're mutually exclusive as a value of 'true' for 'isCompleted'
-  would automatically make any accompanying value for dueDate unnecessary.
-  So it looks all the following combinations of values as parameters would be valid:
-  text, dueDate
-  text, isCompleted
-  texts
-  dueDate
-  isCompleted
-   */
-  @SqlUpdate("UPDATE todo set text = :s.text, is_completed = :s.isCompleted where id = :s.id")
-  void update(@BindBean("s") Todo todo);
-
 }

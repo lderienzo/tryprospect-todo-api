@@ -3,49 +3,30 @@ package com.tryprospect.todo.resources;
 import com.tryprospect.todo.api.Todo;
 import com.tryprospect.todo.db.TodoDAO;
 import com.tryprospect.todo.container.StatusFilterFeature;
-import com.tryprospect.todo.utils.TestTodoCreater;
-import com.tryprospect.todo.utils.TestUtils;
 
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.dropwizard.testing.junit5.ResourceExtension;
 
 import org.eclipse.jetty.http.HttpStatus;
 import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.platform.commons.logging.Logger;
-import org.junit.platform.commons.logging.LoggerFactory;
+import org.junit.platform.commons.logging.*;
 import org.mockito.ArgumentCaptor;
 
 import javax.ws.rs.ProcessingException;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.Invocation;
-import javax.ws.rs.client.WebTarget;
-import javax.ws.rs.core.GenericType;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriBuilder;
+import javax.ws.rs.client.*;
+import javax.ws.rs.core.*;
 
-import java.io.IOException;
 import java.net.URI;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
-import static com.tryprospect.todo.validation.Messages.NULL_LIST_OF_TODOS_RETURNED_ERROR;
-import static com.tryprospect.todo.validation.Messages.NULL_TODO_RETURNED_ERROR;
-import static com.tryprospect.todo.validation.Messages.TODO_VALIDATION_ERROR;
+import static com.tryprospect.todo.utils.TestTodoCreator.*;
+import static com.tryprospect.todo.validation.ValidationMessages.*;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 // TODO: look into a better way of organizing and cleaning up tests.
@@ -148,7 +129,7 @@ public class TodoResourceTest {
         // then
         assertThat(response.getStatusInfo().getStatusCode())
                 .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY_422);
-        assertThat(responseMessage(response)).contains(TODO_VALIDATION_ERROR);
+        assertThat(responseMessage(response)).contains(CREATE_TODO_VALIDATION_ERROR_MSG_KEY);
     }
 
     private String responseMessage(Response response) {
@@ -173,7 +154,7 @@ public class TodoResourceTest {
         Response response = makeRequestToCreateNewTodo(newTodoText);
         // then
         assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
-        assertThat(responseMessage(response)).contains(NULL_TODO_RETURNED_ERROR);
+        assertThat(responseMessage(response)).contains(NULL_TODO_RETURNED_ERROR_MSG_KEY);
     }
 
     @Test
@@ -189,9 +170,8 @@ public class TodoResourceTest {
 
     @Test
     public void testUpdateTodo_whenAllValuesExceptDueDateArePresentAndValidThen204Returned() {
-
         // when
-        Response response = makeRequestToUpdateTodo(baseTodoUri.getPath(), expectedTodo);
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), expectedTodo);
         // then
         verifyDaoUpdateMethodWasCalledWithCorrectValue(expectedTodo);
         assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT_204);
@@ -201,17 +181,16 @@ public class TodoResourceTest {
         return invokeForUri(uri).put(Entity.entity(todoToUpdate, MediaType.APPLICATION_JSON_TYPE));
     }
 
-    private vo(Todo expectedTodo) {
+    private void verifyDaoUpdateMethodWasCalledWithCorrectValue(Todo expectedTodo) {
         verify(MOCK_TODO_DAO, times(1)).update(expectedTodo);
     }
 
     @Test
     public void testUpdateTodo_whenAllValuesValidIncludingFutureValueForDueDateThen204Returned() {
-
         // given
-        Todo validTodoWithFutureValueForDueDate = TestTodoCreater.copyCreateNewTodoWithFutureValueForDueDate(expectedTodo);
+        Todo validTodoWithFutureValueForDueDate = copyCreateNewTodoWithFutureValueForDueDate();
         // when
-        Response response = makeRequestToUpdateTodo(baseTodoUri.getPath(), validTodoWithFutureValueForDueDate);
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), validTodoWithFutureValueForDueDate);
         // then
         verifyDaoUpdateMethodWasCalledWithCorrectValue(validTodoWithFutureValueForDueDate);
         assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT_204);
@@ -219,11 +198,10 @@ public class TodoResourceTest {
 
     @Test
     public void testUpdateTodo_whenNullValueForIdThen422Returned() {
-
         // given
-        Todo todoWithNullId = TestTodoCreater.copyCreateNewTodoWithNullId(expectedTodo);
+        Todo todoWithNullId = copyCreateNewTodoWithNullId();
         // when
-        Response response = makeRequestToUpdateTodo(baseTodoUri.getPath(), todoWithNullId);
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoWithNullId);
         // then
         assertThatResponseStatusIsUnprocessableEntity422(response);
     }
@@ -234,99 +212,120 @@ public class TodoResourceTest {
 
     @Test
     public void testUpdateTodo_whenNullValueForTextThen422Returned() {
-
         // given
-        Todo todoWithNullText = TestTodoCreater.copyCreateNewTodoWithNullText(expectedTodo);
+        Todo todoWithNullText = copyCreateNewTodoWithNullText();
         // when
-        Response response = makeRequestToUpdateTodo(baseTodoUri.getPath(), todoWithNullText);
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoWithNullText);
         // then
         assertThatResponseStatusIsUnprocessableEntity422(response);
     }
 
     @Test
     public void testUpdateTodo_whenBlankValueForTextThen422Returned() {
-
         // given
-        Todo todoWithBlankText = TestTodoCreater.copyCreateNewTodoWithBlankText(expectedTodo);
+        Todo todoWithBlankText = copyCreateNewTodoWithBlankText();
         // when
-        Response response = makeRequestToUpdateTodo(baseTodoUri.getPath(), todoWithBlankText);
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoWithBlankText);
         // then
         assertThatResponseStatusIsUnprocessableEntity422(response);
     }
 
     @Test
     public void testUpdateTodo_whenNullValueForIsCompletedThen422Returned() {
-
         // given
-        Todo todoWithNullIsCompleted = TestTodoCreater.copyCreateNewTodoWithNullForIsCompleted(expectedTodo);
+        Todo todoWithNullIsCompleted = copyCreateNewTodoWithNullForIsCompleted();
         // when
-        Response response = makeRequestToUpdateTodo(baseTodoUri.getPath(), todoWithNullIsCompleted);
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoWithNullIsCompleted);
         // then
         assertThatResponseStatusIsUnprocessableEntity422(response);
     }
 
     @Test
     public void testUpdateTodo_whenNullValueForCreatedAtThen422Returned() {
-
         // given
-        Todo todoWithNullCreatedAt = TestTodoCreater.copyCreateNewTodoWithNullForCreatedAt(expectedTodo);
+        Todo todoWithNullCreatedAt = copyCreateNewTodoWithNullForCreatedAt();
         // when
-        Response response = makeRequestToUpdateTodo(baseTodoUri.getPath(), todoWithNullCreatedAt);
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoWithNullCreatedAt);
         // then
         assertThatResponseStatusIsUnprocessableEntity422(response);
     }
 
     @Test
     public void testUpdateTodo_whenFutureValueForCreatedAtThen422Returned() {
-
         // given
-        Todo todoWithFutureCreatedAt = TestTodoCreater.copyCreateNewTodoWithFutureValueForCreatedAt(expectedTodo);
+        Todo todoWithFutureCreatedAt = copyCreateNewTodoWithFutureValueForCreatedAt();
         // when
-        Response response = makeRequestToUpdateTodo(baseTodoUri.getPath(), todoWithFutureCreatedAt);
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoWithFutureCreatedAt);
         // then
         assertThatResponseStatusIsUnprocessableEntity422(response);
     }
 
     @Test
     public void testUpdateTodo_whenNullValueForLastModifiedAtThen422Returned() {
-
         // given
-        Todo todoWithNullLastModifiedAt = TestTodoCreater.copyCreateNewTodoWithNullForLastModifiedAt(expectedTodo);
+        Todo todoWithNullLastModifiedAt = copyCreateNewTodoWithNullForLastModifiedAt();
         // when
-        Response response = makeRequestToUpdateTodo(baseTodoUri.getPath(), todoWithNullLastModifiedAt);
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoWithNullLastModifiedAt);
         // then
         assertThatResponseStatusIsUnprocessableEntity422(response);
     }
 
     @Test
     public void testUpdateTodo_whenFutureValueForLastModifiedAtThen422Returned() {
-
         // given
-        Todo todoWithFutureLastModifiedAt = TestTodoCreater.copyCreateNewTodoWithFutureValueForLastModifiedAt(expectedTodo);
+        Todo todoWithFutureLastModifiedAt = copyCreateNewTodoWithFutureValueForLastModifiedAt();
         // when
-        Response response = makeRequestToUpdateTodo(baseTodoUri.getPath(), todoWithFutureLastModifiedAt);
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoWithFutureLastModifiedAt);
         // then
         assertThatResponseStatusIsUnprocessableEntity422(response);
     }
 
     @Test
     public void testUpdateTodo_whenPresentValueForDueDateThen422Returned() {
-
         // given
-        Todo todoWithPresentValueForDueDate = TestTodoCreater.copyCreateNewTodoWithPresentValueForDueDate(expectedTodo);
+        Todo todoWithPresentValueForDueDate = copyCreateNewTodoWithPresentValueForDueDate();
         // when
-        Response response = makeRequestToUpdateTodo(baseTodoUri.getPath(), todoWithPresentValueForDueDate);
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoWithPresentValueForDueDate);
         // then
         assertThatResponseStatusIsUnprocessableEntity422(response);
     }
 
     @Test
     public void testUpdateTodo_whenPastValueForDueDateThen422Returned() {
-
         // given
-        Todo todoWithPastValueForDueDate = TestTodoCreater.copyCreateNewTodoWithPastValueForDueDate(expectedTodo);
+        Todo todoWithPastValueForDueDate = copyCreateNewTodoWithPastValueForDueDate();
         // when
-        Response response = makeRequestToUpdateTodo(baseTodoUri.getPath(), todoWithPastValueForDueDate);
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoWithPastValueForDueDate);
+        // then
+        assertThatResponseStatusIsUnprocessableEntity422(response);
+    }
+
+    @Test
+    public void testUpdateTodo_testValidForUpdateAnnotation_whenAllFieldsNonNullExceptDueDateThen204Returned() {
+        // given/when
+        Todo todoAllFieldsNonNullExceptDueDate = copyCreateNewTodoAllFieldsNonNullExceptDueDate();
+        // when
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoAllFieldsNonNullExceptDueDate);
+        // then
+        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT_204);
+    }
+
+    @Test
+    public void testUpdateTodo_testValidForUpdateAnnotation_whenValueForDueDateAndIsCompletedFalseThen204Returned() {
+        // given/when
+        Todo todoValueForDueDateAndIsCompletedFalse = copyCreateNewTodoValueForDueDateAndIsCompletedFalse();
+        // when
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoValueForDueDateAndIsCompletedFalse);
+        // then
+        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT_204);
+    }
+
+    @Test
+    public void testUpdateTodo_testValidForUpdateAnnotation_whenValueForDueDateAndIsCompletedTrueThen422Returned() {
+        // given/when
+        Todo todoValueForDueDateAndIsCompletedTrue = copyCreateNewTodoValueForDueDateAndIsCompletedTrue();
+        // when
+        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoValueForDueDateAndIsCompletedTrue);
         // then
         assertThatResponseStatusIsUnprocessableEntity422(response);
     }
@@ -413,7 +412,7 @@ public class TodoResourceTest {
         Response response = makeRequestToReturnResponse(baseTodoUri.getPath());
         // then
         assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY_422);
-        assertThat(responseMessage(response)).contains(NULL_LIST_OF_TODOS_RETURNED_ERROR);
+        assertThat(responseMessage(response)).contains(NULL_LIST_OF_TODOS_RETURNED_ERROR_MSG_KEY);
     }
 
     private Response makeRequestToReturnResponse(String uriToUse) {
