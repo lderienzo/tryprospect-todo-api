@@ -28,8 +28,6 @@ The web layer must also handle the exceptions thrown by the other layers.
 Because the web layer is the entry point of our application,
 it must take care of authentication and act as a first line of defense against unauthorized users.
  */
-
-
 @Path("/todos")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
@@ -73,5 +71,4 @@ public class TodoResource {
   public void deleteTodo(@PathParam("id") UUID id) {
     todoDAO.deleteById(id);
   }
-
 }

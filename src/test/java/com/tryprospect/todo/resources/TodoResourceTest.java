@@ -40,19 +40,20 @@ public class TodoResourceTest {
     private static URI uriWithId;
     private static final String INVALID_ID = "some_invalid_value_for_id";
     private static final TodoDAO MOCK_TODO_DAO = mock(TodoDAO.class);
+    private static final Logger LOG = LoggerFactory.getLogger(TodoResourceTest.class);
     public static final ResourceExtension TODO_RESOURCE =
                          ResourceExtension.builder()
                             .addResource(new TodoResource(MOCK_TODO_DAO))
                             .addProvider(StatusFilterFeature.class).build();
-    private static final Logger LOG = LoggerFactory.getLogger(TodoResourceTest.class);
+
 
     @BeforeEach
-    public void setUp() throws IOException {
+    public void setUp() {
         initTodo();
     }
 
-    private static void initTodo() throws IOException {
-        expectedTodo = TestUtils.createTestTodoFromJson();
+    private static void initTodo() {
+        expectedTodo = TODO_TEMPLATE;
         newTodoText = expectedTodo.getText();
         baseTodoUri = getBaseUriFromResource().build();
         uriWithId = buildRequestUriWithIdInPath(expectedTodo.getId().toString());
@@ -66,10 +67,8 @@ public class TodoResourceTest {
         return getBaseUriFromResource().path("/{id}").build(id);
     }
 
-
-
     @AfterEach
-    public void tearDown() {
+    public void tearDownAfterEach() {
         reset(MOCK_TODO_DAO);
     }
 

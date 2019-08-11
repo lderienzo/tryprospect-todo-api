@@ -1,31 +1,22 @@
 package com.tryprospect.todo.db;
 
-import static com.tryprospect.todo.utils.TestUtils.lastModifiedNow;
+import static com.tryprospect.todo.utils.TestTodoCreator.*;
+import static com.tryprospect.todo.utils.TestUtils.*;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Java6Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
-import java.time.Clock;
-import java.time.LocalDate;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
 
 import org.flywaydb.core.Flyway;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.*;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 import com.codahale.metrics.MetricRegistry;
@@ -111,7 +102,7 @@ public class TodoDaoTest {
     @Test
     public void testInsert_whenNonEmptyTextThenNewTodoCreated() {
         // given
-        Date expectedLastModifiedDate = lastModifiedNow();
+        Date expectedLastModifiedDate = getPresentDate();
         String expectedLastModifiedAt = removeSeconds(expectedLastModifiedDate);
         String expectedCreatedAt = expectedLastModifiedAt;
         // when
@@ -224,11 +215,6 @@ public class TodoDaoTest {
         checkUpdateComparingLastModifedSeparately(expectedTodo);
     }
 
-    private Todo copyCreateTodoChangingTextAndLastModified(Todo expectedTodo) {
-        return new Todo(expectedTodo.getId().toString(), MODIFIED_TODO_TEXT, Boolean.FALSE,
-                expectedTodo.getCreatedAt(), lastModifiedNow(), null);
-    }
-
     private void checkUpdateComparingLastModifedSeparately(Todo expectedTodo) {
         Todo updatedTodo = todoDAO.findById(expectedTodo.getId()).get();
         assertThat(updatedTodo).isEqualToIgnoringGivenFields(expectedTodo, "lastModifiedAt");
@@ -253,12 +239,6 @@ public class TodoDaoTest {
         assertThat(removeSeconds(updatedTodo.getDueDate())).isEqualTo(removeSeconds(expectedTodo.getDueDate()));
     }
 
-    private Todo copyCreateTodoChangingDueDateAndLastModified(Todo expectedTodo) {
-        return new Todo(expectedTodo.getId().toString(), expectedTodo.getText(), Boolean.FALSE,
-                expectedTodo.getCreatedAt(), lastModifiedNow(),
-                createDueDateOfOneMonthFromCreationDate(expectedTodo.getCreatedAt()));
-    }
-
     @Test
     public void testUpdate_whenIsCompletedChangedThenValueProperlySaved() {
         // given
@@ -268,11 +248,6 @@ public class TodoDaoTest {
         todoDAO.update(expectedTodo);
         // then
         checkUpdateComparingLastModifedSeparately(expectedTodo);
-    }
-
-    private Todo copyCreateTodoChangingIsCompletedAndLastModified(Todo expectedTodo) {
-        return new Todo(expectedTodo.getId().toString(), expectedTodo.getText(), Boolean.TRUE,
-                expectedTodo.getCreatedAt(), lastModifiedNow(), null);
     }
 
     @Test
@@ -286,11 +261,6 @@ public class TodoDaoTest {
         checkUpdateComparingLastModifedSeparately(expectedTodo);
     }
 
-    private Todo copyCreateTodoChangingIsCompletedTextAndLastModified(Todo expectedTodo) {
-        return new Todo(expectedTodo.getId().toString(), MODIFIED_TODO_TEXT, Boolean.TRUE,
-                expectedTodo.getCreatedAt(), lastModifiedNow(), null);
-    }
-
     @Test
     public void testUpdate_whenDueDateAndTextChangedThenValueProperlySaved() {
         // given
@@ -300,18 +270,6 @@ public class TodoDaoTest {
         todoDAO.update(expectedTodo);
         // then
         checkUpdateComparingLastModifedAndDueDateSeparately(expectedTodo);
-    }
-
-    private Todo copyCreateTodoChangingDueDateTextAndLastModified(Todo expectedTodo) {
-        return new Todo(expectedTodo.getId().toString(), MODIFIED_TODO_TEXT, Boolean.FALSE,
-                expectedTodo.getCreatedAt(), lastModifiedNow(),
-                createDueDateOfOneMonthFromCreationDate(expectedTodo.getCreatedAt()));
-    }
-
-    private Date createDueDateOfOneMonthFromCreationDate(Date createdAt) {
-        LocalDate createdAtLocalDate = new java.sql.Date(createdAt.getTime()).toLocalDate();
-        createdAtLocalDate.plusMonths(1L);
-        return java.sql.Date.valueOf(createdAtLocalDate);
     }
 
     @Test
@@ -325,12 +283,6 @@ public class TodoDaoTest {
         checkUpdateComparingLastModifedAndDueDateSeparately(expectedTodo);
     }
 
-    private Todo copyCreateTodoChangingDueDateIsCompletedAndLastModified(Todo expectedTodo) {
-        return new Todo(expectedTodo.getId().toString(), expectedTodo.getText(), Boolean.TRUE,
-                expectedTodo.getCreatedAt(), lastModifiedNow(),
-                createDueDateOfOneMonthFromCreationDate(expectedTodo.getCreatedAt()));
-    }
-
     @Test
     public void testUpdate_whenDueDateIsCompletedAndTextChangedThenValueProperlySaved() {
         // given
@@ -340,12 +292,6 @@ public class TodoDaoTest {
         todoDAO.update(expectedTodo);
         // then
         checkUpdateComparingLastModifedAndDueDateSeparately(expectedTodo);
-    }
-
-    private Todo copyCreateTodoChangingDueDateIsCompletedTextAndLastModified(Todo expectedTodo) {
-        return new Todo(expectedTodo.getId().toString(), MODIFIED_TODO_TEXT, Boolean.TRUE,
-                expectedTodo.getCreatedAt(), lastModifiedNow(),
-                createDueDateOfOneMonthFromCreationDate(expectedTodo.getCreatedAt()));
     }
 
     @Test

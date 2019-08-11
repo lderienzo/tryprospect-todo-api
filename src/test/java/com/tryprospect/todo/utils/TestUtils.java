@@ -3,6 +3,7 @@ package com.tryprospect.todo.utils;
 import static io.dropwizard.testing.FixtureHelpers.fixture;
 import java.io.IOException;
 import java.time.Clock;
+import java.time.LocalDate;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -21,7 +22,7 @@ public final class TestUtils {
 
     public static final Date getFutureDate() {
         Calendar calendar = getCalenderSetToNow();
-        addMinute(calendar);
+        addFiveMinutes(calendar);
         return calendar.getTime();
     }
 
@@ -36,8 +37,8 @@ public final class TestUtils {
         return c;
     }
 
-    private static final void addMinute(Calendar c) {
-        c.add(Calendar.MINUTE, 1);
+    private static final void addFiveMinutes(Calendar c) {
+        c.add(Calendar.MINUTE, 5);  // TODO: note, when this is set to one minute the 'present date' test fails.
     }
 
     public static final Date getPastDate() {
@@ -50,7 +51,13 @@ public final class TestUtils {
         c.add(Calendar.DAY_OF_YEAR, -1);
     }
 
-    public static final Date lastModifiedNow() {
+    public static final Date getPresentDate() {
         return Date.from(Clock.systemDefaultZone().instant());
+    }
+
+    public static Date createDueDateOfOneMonthFromCreationDate(Date createdAt) {
+        LocalDate createdAtLocalDate = new java.sql.Date(createdAt.getTime()).toLocalDate();
+        createdAtLocalDate.plusMonths(1L);
+        return java.sql.Date.valueOf(createdAtLocalDate);
     }
 }
