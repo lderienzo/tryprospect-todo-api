@@ -100,16 +100,16 @@ public class TodoDaoTest {
     }
 
     @Test
-    public void testInsert_whenNonEmptyTextThenNewTodoCreated() {
+    public void testInsert_whenAllRequiredFieldsPresentThenNewTodoCreated() {
         // given
         Date expectedLastModifiedDate = getPresentDate();
         String expectedLastModifiedAt = removeSeconds(expectedLastModifiedDate);
         String expectedCreatedAt = expectedLastModifiedAt;
         // when
-        Todo actualTodo = createTodo(TODO_TEXT);
+        Todo actualTodo = createTodo(TODO_TEMPLATE);
         // then
         assertThat(actualTodo.getCompleted()).isFalse();
-        assertThat(actualTodo.getText()).isEqualTo(TODO_TEXT);
+        assertThat(actualTodo.getText()).isEqualTo(TODO_TEMPLATE.getText());
         assertThat(idIsValidUuid(actualTodo.getId().toString())).isTrue();
         assertThat(removeSeconds(actualTodo.getCreatedAt())).isEqualTo(expectedCreatedAt);
         assertThat(removeSeconds(actualTodo.getLastModifiedAt())).isEqualTo(expectedLastModifiedAt);
@@ -119,13 +119,13 @@ public class TodoDaoTest {
         return DATE_FORMAT.format(dateToFormat);
     }
 
-    private Todo createTodo(String todoText) {
-        return todoDAO.insert(todoText);
+    private Todo createTodo(Todo todo) {
+        return todoDAO.insert(todo);
     }
 
     @Test
     public void testInsert_whenTextIsNullThenException() {
-        Assertions.assertThrows(UnableToExecuteStatementException.class, () ->
+        Assertions.assertThrows(NullPointerException.class, () ->
             createTodo(null)
         );
     }
@@ -161,13 +161,13 @@ public class TodoDaoTest {
 
     private List<Todo> addThreeTodos() {
         return IntStream.range(1, 4)
-                .mapToObj(i -> createTodo("test todo " + i + " text"))
+                .mapToObj(i -> createTodo(copyCreateTodoWithModifiedText(TODO_TEMPLATE, i + "")))
                 .collect(toList());
     }
 
     private void assertThatAllAddedTodosWhereFound() {
         IntStream.range(0, 3).forEach(i ->
-                assertThat(actualTodos.get(i).toString()).isEqualTo(expectedTodos.get(i).toString()));
+                assertThat(actualTodos.get(i)).isEqualToComparingFieldByField(expectedTodos.get(i)));
     }
 
     @Test
@@ -183,7 +183,7 @@ public class TodoDaoTest {
     @Test
     public void testFindById_whenValidIdPassedThenFound() {
         // given
-        Todo todoToFind = createTodo(TODO_TEXT);
+        Todo todoToFind = createTodo(TODO_TEMPLATE);
         // when
         Optional<Todo> todoFound = todoDAO.findById(todoToFind.getId());
         // then
@@ -203,7 +203,7 @@ public class TodoDaoTest {
     @Test
     public void testUpdate_whenTextChangedThenValueProperlySaved() {
         // given
-        Todo newTodo = createTodo(TODO_TEXT);
+        Todo newTodo = createTodo(TODO_TEMPLATE);
         Todo expectedTodo = copyCreateTodoChangingTextAndLastModified(newTodo);
         // when
         todoDAO.update(expectedTodo);
@@ -220,7 +220,7 @@ public class TodoDaoTest {
     @Test
     public void testUpdate_whenDueDateChangedThenValueProperlySaved() {
         // given
-        Todo newTodo = createTodo(TODO_TEXT);
+        Todo newTodo = createTodo(TODO_TEMPLATE);
         Todo expectedTodo = copyCreateTodoChangingDueDateAndLastModified(newTodo);
         // when
         todoDAO.update(expectedTodo);
@@ -238,7 +238,7 @@ public class TodoDaoTest {
     @Test
     public void testUpdate_whenIsCompletedChangedThenValueProperlySaved() {
         // given
-        Todo newTodo = createTodo(TODO_TEXT);
+        Todo newTodo = createTodo(TODO_TEMPLATE);
         Todo expectedTodo = copyCreateTodoChangingIsCompletedAndLastModified(newTodo);
         // when
         todoDAO.update(expectedTodo);
@@ -249,7 +249,7 @@ public class TodoDaoTest {
     @Test
     public void testUpdate_whenIsCompletedAndTextChangedThenValueProperlySaved() {
         // given
-        Todo newTodo = createTodo(TODO_TEXT);
+        Todo newTodo = createTodo(TODO_TEMPLATE);
         Todo expectedTodo = copyCreateTodoChangingIsCompletedTextAndLastModified(newTodo);
         // when
         todoDAO.update(expectedTodo);
@@ -260,7 +260,7 @@ public class TodoDaoTest {
     @Test
     public void testUpdate_whenDueDateAndTextChangedThenValueProperlySaved() {
         // given
-        Todo newTodo = createTodo(TODO_TEXT);
+        Todo newTodo = createTodo(TODO_TEMPLATE);
         Todo expectedTodo = copyCreateTodoChangingDueDateTextAndLastModified(newTodo);
         // when
         todoDAO.update(expectedTodo);
@@ -271,7 +271,7 @@ public class TodoDaoTest {
     @Test
     public void testUpdate_whenDueDateAndIsCompletedChangedThenValueProperlySaved() {
         // given
-        Todo newTodo = createTodo(TODO_TEXT);
+        Todo newTodo = createTodo(TODO_TEMPLATE);
         Todo expectedTodo = copyCreateTodoChangingDueDateIsCompletedAndLastModified(newTodo);
         // when
         todoDAO.update(expectedTodo);
@@ -282,7 +282,7 @@ public class TodoDaoTest {
     @Test
     public void testUpdate_whenDueDateIsCompletedAndTextChangedThenValueProperlySaved() {
         // given
-        Todo newTodo = createTodo(TODO_TEXT);
+        Todo newTodo = createTodo(TODO_TEMPLATE);
         Todo expectedTodo = copyCreateTodoChangingDueDateIsCompletedTextAndLastModified(newTodo);
         // when
         todoDAO.update(expectedTodo);
@@ -293,7 +293,7 @@ public class TodoDaoTest {
     @Test
     public void testUpdate_whenOnlyLastModifiedChangedThenValueProperlySaved() {
         // given
-        Todo newTodo = createTodo(TODO_TEXT);
+        Todo newTodo = createTodo(TODO_TEMPLATE);
         Todo expectedTodo = newTodo;
         // when
         todoDAO.update(expectedTodo);
@@ -304,7 +304,7 @@ public class TodoDaoTest {
     @Test
     public void testDeleteById_whenValidIdThenDeleted() {
         // given
-        Todo todoToDelete = createTodo(TODO_TEXT);
+        Todo todoToDelete = createTodo(TODO_TEMPLATE);
         // when
         todoDAO.deleteById(todoToDelete.getId());
         // then

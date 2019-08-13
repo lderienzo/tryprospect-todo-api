@@ -1,5 +1,6 @@
 package com.tryprospect.todo;
 
+import static com.tryprospect.todo.utils.TestTodoCreator.TODO_TEMPLATE;
 import static com.tryprospect.todo.utils.TestTodoCreator.copyCreateNewTodoWithIsCompletedTrue;
 import static com.tryprospect.todo.utils.TestTodoCreator.copyCreateTodoWithDueDateValue;
 import static org.assertj.core.api.Java6Assertions.assertThat;
@@ -50,7 +51,6 @@ public class TodoIntegrationSmokeTest {
     private static URI relativeUriWithId;
     private static Todo todo;
     private static Todo updatedTodo;
-    private static final String NEW_TODO_TEXT = "some new todo text";
     private static final String NEW_TODO_IS_NULL_MSG = "New Todo is null.";
     private static final String UPDATED_TODO_IS_NULL_MSG = "Updated Todo is null.";
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm");
@@ -86,18 +86,19 @@ public class TodoIntegrationSmokeTest {
         String expectedCreatedAt = DATE_FORMAT.format(expectedCreatedDateOfNow);
         String expectedLastModifiedAt = expectedCreatedAt;
         // when - make call to create new Todo.
-        todo = makePostRequestToCreateNewTodo(relativeUri, NEW_TODO_TEXT);
+        todo = makePostRequestToCreateNewTodo(relativeUri, TODO_TEMPLATE);
         // then
         assertThat(todo.getId()).isNotNull();
-        assertThat(todo.getText()).isEqualTo(NEW_TODO_TEXT);
+        assertThat(todo.getText()).isEqualTo(TODO_TEMPLATE.getText());
         assertThat(todo.getCompleted()).isFalse();
+        assertThat(todo.getDueDate()).isNull();
         assertThat(DATE_FORMAT.format(todo.getCreatedAt())).isEqualTo(expectedCreatedAt);
         assertThat(DATE_FORMAT.format(todo.getLastModifiedAt())).isEqualTo(expectedLastModifiedAt);
     }
 
-    private Todo makePostRequestToCreateNewTodo(URI relativeUri, String newTodoText) {
+    private Todo makePostRequestToCreateNewTodo(URI relativeUri, Todo todoToCreate) {
         URI absoluteUri = buildAbsoluteUriWithRelative(relativeUri);
-        return makeRequest(absoluteUri).post(Entity.entity(newTodoText, MediaType.APPLICATION_JSON_TYPE), new GenericType<Todo>() {});
+        return makeRequest(absoluteUri).post(Entity.entity(todoToCreate, MediaType.APPLICATION_JSON_TYPE), new GenericType<Todo>() {});
     }
 
     private static URI buildAbsoluteUriWithRelative(URI relativeUri) {
@@ -196,6 +197,14 @@ public class TodoIntegrationSmokeTest {
         assertThat(actualTodoOptional.isPresent()).isTrue();
         assertThat(actualTodoOptional.get()).isEqualToComparingFieldByField(updatedTodo);
     }
+
+
+    // TODO: incorporate the following test scenarios:
+    /*
+    - marking a task as completed (or uncompleted)
+    - editing the task text
+    - changing the due date
+     */
 
     @Test
     @Order(6)

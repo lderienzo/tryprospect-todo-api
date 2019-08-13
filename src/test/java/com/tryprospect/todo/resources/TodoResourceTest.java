@@ -1,5 +1,6 @@
 package com.tryprospect.todo.resources;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tryprospect.todo.api.Todo;
 import com.tryprospect.todo.db.TodoDAO;
 import com.tryprospect.todo.container.StatusFilterFeature;
@@ -25,7 +26,6 @@ import static com.tryprospect.todo.utils.TestTodoCreator.*;
 import static com.tryprospect.todo.validation.ValidationMessages.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 
@@ -33,9 +33,8 @@ import static org.mockito.Mockito.*;
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class TodoResourceTest {
 
-    private ArgumentCaptor<String> todoInsertCaptor = ArgumentCaptor.forClass(String.class);
+    private ArgumentCaptor<Todo> todoInsertCaptor = ArgumentCaptor.forClass(Todo.class);
     private static Todo expectedTodo;
-    private static String newTodoText;
     private static URI baseTodoUri;
     private static URI uriWithId;
     private static final String INVALID_ID = "some_invalid_value_for_id";
@@ -54,7 +53,6 @@ public class TodoResourceTest {
 
     private static void initTodo() {
         expectedTodo = TODO_TEMPLATE;
-        newTodoText = expectedTodo.getText();
         baseTodoUri = getBaseUriFromResource().build();
         uriWithId = buildRequestUriWithIdInPath(expectedTodo.getId().toString());
     }
@@ -73,23 +71,24 @@ public class TodoResourceTest {
     }
 
     @Test
-    public void testCreateTodo_whenPassedTextThenNewTodoCreated() {
+    public void testCreateTodo_whenAllRequiredFieldsPresentThenNewTodoCreated() {
         // given
+        String noErrorMsgExpected = "";
         mockInsertMethodCall();
         // when
-        Response response = makeRequestToCreateNewTodo(newTodoText);
+        Response response = makeRequestToCreateNewTodo(expectedTodo);
         // then
         assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.CREATED_201);
-        verifyInsertMethodWasCalledWithExpectedValue();
-        verifyExpectedValueWasReturned(response);
+        verifyInsertMethodWasCalledWithExpectedValue(expectedTodo);
+        verifyExpectedValueWasReturned(response, expectedTodo, noErrorMsgExpected);
     }
 
     private void mockInsertMethodCall() {
-        when(MOCK_TODO_DAO.insert(anyString())).thenReturn(expectedTodo);
+        when(MOCK_TODO_DAO.insert(any())).thenReturn(expectedTodo);
     }
 
-    private Response makeRequestToCreateNewTodo(String param) {
-        return invokeForUri(baseTodoUri.getPath()).post(Entity.entity(param, MediaType.APPLICATION_JSON_TYPE));
+    private Response makeRequestToCreateNewTodo(Todo todoToCreate) {
+        return invokeForUri(baseTodoUri.getPath()).post(Entity.entity(todoToCreate, MediaType.APPLICATION_JSON_TYPE));
     }
 
     private static final Invocation.Builder invokeForUri(String uri) {
@@ -100,35 +99,78 @@ public class TodoResourceTest {
         return TODO_RESOURCE.target(uri);
     }
 
-    private void verifyInsertMethodWasCalledWithExpectedValue() {
+    private void verifyInsertMethodWasCalledWithExpectedValue(Todo insertedTodo) {
         verify(MOCK_TODO_DAO).insert(todoInsertCaptor.capture());
-        assertThat(todoInsertCaptor.getValue()).isEqualTo(expectedTodo.getText());
+        assertThat(todoInsertCaptor.getValue()).isEqualTo(insertedTodo);
     }
 
-    private void verifyExpectedValueWasReturned(Response response) {
+    private void verifyExpectedValueWasReturned(Response response, Todo todoToCheck, String expectedErrMsg) {
         assertThat(response.hasEntity()).isTrue();
-        Todo newTodo = getNewTodoFromResponse(response);
-        assertThat(newTodo).isEqualToComparingFieldByField(expectedTodo);
+        ResponseObject responseObject = new ResponseObject(response, Todo.class);
+        if (responseObject.isError)
+            assertThat(responseObject.getErrorMsgFromResponse()).isEqualTo(expectedErrMsg);
+        else {
+            assertThat(responseObject.getResponseEntity().isPresent()).isTrue();
+            assertThat(responseObject.getResponseEntity().get()).isEqualToComparingFieldByField(todoToCheck);
+        }
     }
 
-    private Todo getNewTodoFromResponse(Response response) {
-        Todo newTodo;
-        try {
-            newTodo = response.readEntity(Todo.class);
-        } finally {
-            response.close();
+    private class ResponseObject<T> {
+        private static final String ERR_MSG_KEY = "errors";
+        private final Class<T> type;
+        private Response response;
+        private Object readObject;
+        private T responseEntity;
+        private boolean isError;
+
+        ResponseObject(Response response, Class<T> type) {
+            this.response = response;
+            this.type = type;
+            getObjectFromResponse();
+            isError = isErrorInResponse();
         }
-        return newTodo;
+
+        private void getObjectFromResponse() {
+            try {
+                readObject = response.readEntity(Object.class);
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                response.close();
+            }
+        }
+
+        private boolean isErrorInResponse() {
+            return readObject instanceof Map && ((Map)readObject).containsKey(ERR_MSG_KEY);
+        }
+
+        String getErrorMsgFromResponse() {
+            return ((List)((Map)readObject).get("errors")).get(0).toString();
+        }
+
+        Optional<T> getResponseEntity() {
+            if (isError == false) {
+                responseEntity = new ObjectMapper().convertValue(readObject, type);
+            }
+            return Optional.of(responseEntity);
+        }
     }
 
     @Test
-    public void testCreateTodo_whenTodoTextIsBlankThen422returned() {
-        // given/when
-        Response response = makeRequestToCreateNewTodo("");
+    public void testCreateTodo_whenTodoTextIsBlankThen500returned() {
+        // given
+        Todo todoWithBlankText = copyCreateNewTodoWithBlankText();
+        mockInsertMethodCallForTodoWithBlankText(todoWithBlankText);
+        // when
+        Response response = makeRequestToCreateNewTodo(todoWithBlankText);
         // then
-        assertThat(response.getStatusInfo().getStatusCode())
-                .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY_422);
-        assertThat(responseMessage(response)).contains(CREATE_TODO_VALIDATION_ERROR_MSG_KEY);
+        verifyInsertMethodWasCalledWithExpectedValue(todoWithBlankText);
+        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
+        verifyExpectedValueWasReturned(response, todoWithBlankText, "server response text may not be empty");   // TODO: add to validation messages?
+    }
+
+    private void mockInsertMethodCallForTodoWithBlankText(Todo todoToInsert) {
+        when(MOCK_TODO_DAO.insert(any())).thenReturn(todoToInsert);
     }
 
     private String responseMessage(Response response) {
@@ -148,9 +190,9 @@ public class TodoResourceTest {
     @Test
     public void testCreateTodo_whenNullTodoReturnedByDaoMethodThen500returned() {
         // given
-        when(MOCK_TODO_DAO.insert(anyString())).thenReturn(null);
+        when(MOCK_TODO_DAO.insert(any())).thenReturn(null);
         // when
-        Response response = makeRequestToCreateNewTodo(newTodoText);
+        Response response = makeRequestToCreateNewTodo(expectedTodo);
         // then
         assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
         assertThat(responseMessage(response)).contains(NULL_TODO_RETURNED_ERROR_MSG_KEY);
@@ -159,10 +201,10 @@ public class TodoResourceTest {
     @Test
     public void testCreateTodo_whenDaoMethodThrowsExceptionThen500returned() {
         // given
-        when(MOCK_TODO_DAO.insert((anyString())))
+        when(MOCK_TODO_DAO.insert((any())))
                 .thenThrow(UnableToExecuteStatementException.class);
         // when
-        Response response = makeRequestToCreateNewTodo(newTodoText);
+        Response response = makeRequestToCreateNewTodo(expectedTodo);
         // then
         assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
     }

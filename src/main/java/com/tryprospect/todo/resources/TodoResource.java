@@ -19,15 +19,12 @@ import java.util.*;
 import org.hibernate.validator.constraints.NotBlank;
 
 
-/*
-The web layer is the uppermost layer of a web application.
-It is responsible of processing user’s input and returning the correct response back to the user.
-
-The web layer must also handle the exceptions thrown by the other layers.
-
-Because the web layer is the entry point of our application,
-it must take care of authentication and act as a first line of defense against unauthorized users.
- */
+//TODO: BIG CHANGES
+// * Refactor create method to take values for duedate and iscompleted, or use whole Todo object?
+// * change constructor data type for 'id' in Todo class to UUID
+// * change all Date objects to LocalDate/LocalDateTime?
+// * refactor unit tests to use one set of code for client api request building and sending. better way to do integraton test?
+// * Implement new feature using NLP to infer due date
 @Path("/todos")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
@@ -44,8 +41,8 @@ public class TodoResource {
   @Valid
   @Status(Status.CREATED)
   @NotNull(message = ValidationMessages.NULL_TODO_RETURNED_ERROR_MSG_KEY)
-  public Todo createTodo(@NotBlank(message = CREATE_TODO_VALIDATION_ERROR_MSG_KEY) String newTodoText) {
-    return todoDAO.insert(newTodoText);
+  public Todo createTodo(Todo newTodo) {
+    return todoDAO.insert(newTodo);
   }
 
   @PUT

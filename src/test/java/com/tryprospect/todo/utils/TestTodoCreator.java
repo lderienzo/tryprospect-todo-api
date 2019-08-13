@@ -176,4 +176,9 @@ public final class TestTodoCreator {
                 expectedTodo.getCreatedAt(), getPresentDate(),
                 createDueDateOfOneMonthFromCreationDate(expectedTodo.getCreatedAt()));
     }
+
+    public static Todo copyCreateTodoWithModifiedText(Todo copyFrom, String text) {
+        return new Todo(copyFrom.getId().toString(), copyFrom.getText() + " " + text, copyFrom.getIsCompleted(),
+                copyFrom.getCreatedAt(), copyFrom.getLastModifiedAt(), copyFrom.getDueDate());
+    }
 }
