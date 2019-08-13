@@ -51,15 +51,14 @@ public final class Todo {
   }
 
   @JsonCreator
-  public Todo(@JsonProperty("id") String id,  // TODO: change to UUID
+  public Todo(@JsonProperty("id") UUID id,
               @JsonProperty("text") String text,
               @JsonProperty("is_completed") Boolean isCompleted,
               @JsonProperty("created_at") Date createdAt,
               @JsonProperty("last_modified_at") Date lastModifiedAt,
               @JsonProperty("due_date") Date dueDate) {
 
-    if (!Strings.isNullOrEmpty(id))
-      this.id = UUID.fromString(id);
+    this.id = id;
     this.text = text;
     this.isCompleted = isCompleted;
     this.createdAt = createdAt;

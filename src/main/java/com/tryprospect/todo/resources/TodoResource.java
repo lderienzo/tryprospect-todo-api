@@ -20,9 +20,8 @@ import org.hibernate.validator.constraints.NotBlank;
 
 
 //TODO: BIG CHANGES
-// * Refactor create method to take values for duedate and iscompleted, or use whole Todo object?
-// * change constructor data type for 'id' in Todo class to UUID
 // * change all Date objects to LocalDate/LocalDateTime?
+// * create ValidForCreation annotation
 // * refactor unit tests to use one set of code for client api request building and sending. better way to do integraton test?
 // * Implement new feature using NLP to infer due date
 @Path("/todos")
