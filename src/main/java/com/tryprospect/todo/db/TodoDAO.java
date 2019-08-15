@@ -32,13 +32,13 @@ public interface TodoDAO {
   @GetGeneratedKeys
   Todo insert(@BindBean("t") Todo todo);
 */
-  @GetGeneratedKeys
-  @SqlUpdate("INSERT INTO todo (text, is_completed, due_date) VALUES (:todo.text, :todo.isCompleted, :todo.dueDate)")
-  Todo insert_OLD(@BindFields Todo todo);
 
   @SqlUpdate("INSERT INTO todo (text, is_completed, due_date) VALUES (:t.text, :t.isCompleted, :t.dueDate)")
   @GetGeneratedKeys
   Todo insert(@BindBean("t") Todo todo);
+
+  @SqlUpdate("UPDATE todo set text = :t.text, is_completed = :t.isCompleted, due_date = :t.dueDate where id = :t.id")
+  void update(@BindBean("t") Todo todo);
 
   @SqlQuery("SELECT * FROM todo")
   List<Todo> findAll();
@@ -46,10 +46,7 @@ public interface TodoDAO {
   @SqlQuery("SELECT * FROM todo WHERE id = :id")
   Optional<Todo> findById(@Bind("id") UUID id);
 
-  @SqlUpdate("UPDATE todo set text = :t.text, is_completed = :t.isCompleted, due_date = :t.dueDate where id = :t.id")
-  void update(@BindBean("t") Todo todo);
-
-//  @SqlUpdate("DELETE FROM todo")  // BUG ALSO HERE -- throws "org.jdbi.v3.core.statement.UnableToCreateStatementException: Superfluous named parameters provided..."
+//  @SqlUpdate("DELETE FROM todo")  // BUG ALSO HERE - missing 'WHERE' clause - throws "org.jdbi.v3.core.statement.UnableToCreateStatementException: Superfluous named parameters provided..."
   @SqlUpdate("DELETE FROM todo WHERE id = :id")
   void deleteById(@Bind("id") UUID id);
 }
