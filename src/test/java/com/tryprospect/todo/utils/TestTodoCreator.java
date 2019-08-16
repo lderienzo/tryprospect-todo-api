@@ -1,91 +1,125 @@
 package com.tryprospect.todo.utils;
 
 
-import static com.tryprospect.todo.utils.TestUtils.*;
-import static io.dropwizard.testing.FixtureHelpers.fixture;
+import static com.tryprospect.todo.utils.JSONTestUtils.TODO_TEMPLATE;
 
-import java.io.IOException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 
 import org.junit.platform.commons.logging.Logger;
 import org.junit.platform.commons.logging.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tryprospect.todo.api.Todo;
 
-import io.dropwizard.jackson.Jackson;
 
+// TODO: REFACTOR THIS WHOLE CLASS
 public final class TestTodoCreator {
     private static final Logger LOG = LoggerFactory.getLogger(TestTodoCreator.class);
-    private static final String TODO_JSON_FILE = "fixtures/todo.json";
-    private static final ObjectMapper MAPPER = Jackson.newObjectMapper();
     private static final String TODO_TEXT = "Test todo text.";
     private static final String MODIFIED_TODO_TEXT = TODO_TEXT + " Plus something else.";
-    public static final Todo TODO_TEMPLATE = deserializeFromJsonIntoTodoObject();
 
-    public static String serializeFromTodoObjectIntoJson(Todo todo) {
-        String json = "";
-        try {
-            json = MAPPER.writeValueAsString(todo);
-        } catch (JsonProcessingException e) {
-            LOG.error(e, () -> "Error serializing to JSON.");
-        }
-        return json;
+
+    public static Todo copyCreateTodoWithAllRequiredFieldsPresentAndWithoutOptionalDueDate() {
+        return TODO_TEMPLATE;
     }
 
-    private static Todo deserializeFromJsonIntoTodoObject() {
-        Todo todo = new Todo();
-        try {
-            todo = MAPPER.readValue(fixture(TODO_JSON_FILE), Todo.class);
-        } catch (IOException e) {
-            LOG.error(e, () -> "Error deserializing from JSON.");
-        }
-        return todo;
+    public static Todo createTodoWithAbsentDueDate() {
+        return new Todo(null, "", Boolean.FALSE, null, null, null);
+    }
+
+    public static Todo createTodoWithDueDateTodayAndIsCompletedTrue() {
+        return new Todo(null, "", Boolean.TRUE, null, null, Instant.now());
+    }
+
+    public static Todo createTodoWithFutureDueDateAndIsCompletedFalse() {
+        return new Todo(null, "", Boolean.FALSE, null, null, getPresentDate());
+    }
+
+    public static Todo copyCreateTodoForValidCreation() {
+        return new Todo(null, TODO_TEMPLATE.getText(), TODO_TEMPLATE.getIsCompleted(),
+                null, null, TODO_TEMPLATE.getDueDate().get());
+    }
+
+    public static Todo copyCreateTodoForValidCreationButWithNullText() {
+        return new Todo(null, null, TODO_TEMPLATE.getIsCompleted(),
+                null, null, TODO_TEMPLATE.getDueDate().get());
+    }
+
+    public static Todo copyCreateTodoWithRequiredNullAndEmptyTextString() {
+        return new Todo(null, "", TODO_TEMPLATE.getIsCompleted(),
+                null, null, TODO_TEMPLATE.getDueDate().get());
+    }
+
+    public static Todo copyCreateTodoForValidCreationButWithNullIsCompleted() {
+        return new Todo(null, TODO_TEMPLATE.getText(),null,
+                null, null, TODO_TEMPLATE.getDueDate().get());
+    }
+
+    public static Todo copyCreateTodoForValidCreationButWithNullDueDate() {
+        return new Todo(null, TODO_TEMPLATE.getText(),TODO_TEMPLATE.getIsCompleted(),
+                null, null, null);
     }
 
     public static Todo copyCreateNewTodoWithNullId() {
         return new Todo(null, TODO_TEMPLATE.getText(), TODO_TEMPLATE.getIsCompleted(),
-                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate());
+                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate().orElse(null));
     }
 
     public static Todo copyCreateNewTodoWithNullText() {
         return new Todo(TODO_TEMPLATE.getId(), null, TODO_TEMPLATE.getIsCompleted(),
-                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate());
+                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate().orElse(null));
     }
 
     public static Todo copyCreateNewTodoWithBlankText() {
         return new Todo(TODO_TEMPLATE.getId(), "", TODO_TEMPLATE.getIsCompleted(),
-                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate());
+                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate().orElse(null));
     }
 
     public static Todo copyCreateNewTodoWithNullForIsCompleted() {
         return new Todo(TODO_TEMPLATE.getId(), TODO_TEMPLATE.getText(), null,
-                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate());
+                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate().orElse(null));
     }
 
     public static Todo copyCreateNewTodoWithNullForCreatedAt() {
         return new Todo(TODO_TEMPLATE.getId(), TODO_TEMPLATE.getText(), TODO_TEMPLATE.getIsCompleted(),
-                null, TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate());
+                null, TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate().orElse(null));
     }
 
     public static Todo copyCreateNewTodoWithFutureValueForCreatedAt() {
         return new Todo(TODO_TEMPLATE.getId(), TODO_TEMPLATE.getText(), TODO_TEMPLATE.getIsCompleted(),
-                getFutureDate(), TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate());
+                getFutureDate(), TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate().orElse(null));
+    }
+
+    public static final Instant getFutureDate() {
+        return getPresentDate().plus(1, ChronoUnit.DAYS);
+    }
+
+    public static final Optional<Instant> getOptionalFutureDate() {
+        return Optional.of(getOptionalPresentDate().get().plus(1, ChronoUnit.DAYS));
+    }
+
+    public static final Instant getPresentDate() {
+        return Instant.now();
+    }
+
+    public static final Optional<Instant> getOptionalPresentDate() {
+        return Optional.of(Instant.now());
     }
 
     public static Todo copyCreateNewTodoWithNullForLastModifiedAt() {
         return new Todo(TODO_TEMPLATE.getId(), TODO_TEMPLATE.getText(), TODO_TEMPLATE.getIsCompleted(),
-                TODO_TEMPLATE.getCreatedAt(), null, TODO_TEMPLATE.getDueDate());
+                TODO_TEMPLATE.getCreatedAt(), null, TODO_TEMPLATE.getDueDate().orElse(null));
     }
 
     public static Todo copyCreateNewTodoWithFutureValueForLastModifiedAt() {
         return new Todo(TODO_TEMPLATE.getId(), TODO_TEMPLATE.getText(), TODO_TEMPLATE.getIsCompleted(),
-                TODO_TEMPLATE.getCreatedAt(), getFutureDate(), TODO_TEMPLATE.getDueDate());
+                TODO_TEMPLATE.getCreatedAt(), getFutureDate(), TODO_TEMPLATE.getDueDate().orElse(null));
     }
 
     public static Todo copyCreateNewTodoWithPresentValueForDueDate() {
         return new Todo(TODO_TEMPLATE.getId(), TODO_TEMPLATE.getText(), TODO_TEMPLATE.getIsCompleted(),
-                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), getCalenderSetToNow().getTime());
+                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), getPresentDate());
     }
 
     public static Todo copyCreateNewTodoWithPastValueForDueDate() {
@@ -93,7 +127,16 @@ public final class TestTodoCreator {
                 TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), getPastDate());
     }
 
-    public static Todo copyCreateNewTodoWithFutureValueForDueDate() {
+    public static final Instant getPastDate() {
+        return getPresentDate().minus(1, ChronoUnit.DAYS);
+    }
+
+    public static final Optional<Instant> getOptionalPastDate() {
+        getOptionalPresentDate().get().minus(1, ChronoUnit.DAYS);
+        return getOptionalPresentDate();
+    }
+
+    public static Todo copyCreateTodoWithAllRequiredFieldsPresent() {
         return new Todo(TODO_TEMPLATE.getId(), TODO_TEMPLATE.getText(), TODO_TEMPLATE.getIsCompleted(),
                 TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), getFutureDate());
     }
@@ -115,12 +158,12 @@ public final class TestTodoCreator {
 
     public static Todo copyCreateNewTodoWithIsCompletedTrueAndDueDateNull() {
         return new Todo(TODO_TEMPLATE.getId(), TODO_TEMPLATE.getText(), Boolean.TRUE,
-                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), null);
+                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate().orElse(null));
     }
 
-    public static Todo copyCreateNewTodoAllFieldsNonNullExceptDueDate() {
+    public static Todo copyCreateNewTodoAllFieldValuesPresentExceptDueDate() {
         return new Todo(TODO_TEMPLATE.getId(), TODO_TEMPLATE.getText(), TODO_TEMPLATE.getIsCompleted(),
-                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), null);
+                TODO_TEMPLATE.getCreatedAt(), TODO_TEMPLATE.getLastModifiedAt(), TODO_TEMPLATE.getDueDate().orElse(null));
     }
 
     public static Todo copyCreateNewTodoValueForDueDateAndIsCompletedFalse() {
@@ -135,12 +178,12 @@ public final class TestTodoCreator {
 
     public static Todo copyCreateNewTodoWithIsCompletedTrue(Todo copyFrom) {
         return new Todo(copyFrom.getId(), copyFrom.getText(), Boolean.TRUE,
-                copyFrom.getCreatedAt(), copyFrom.getLastModifiedAt(), copyFrom.getDueDate());
+                copyFrom.getCreatedAt(), copyFrom.getLastModifiedAt(), copyFrom.getDueDate().get());
     }
 
     public static Todo copyCreateTodoChangingTextAndLastModified(Todo expectedTodo) {
         return new Todo(expectedTodo.getId(), MODIFIED_TODO_TEXT, Boolean.FALSE,
-                expectedTodo.getCreatedAt(), getPresentDate(), null);
+                expectedTodo.getCreatedAt(), getPresentDate(), expectedTodo.getDueDate().get());
     }
 
     public static Todo copyCreateTodoChangingDueDateAndLastModified(Todo expectedTodo) {
@@ -163,12 +206,12 @@ public final class TestTodoCreator {
 
     public static Todo copyCreateTodoChangingIsCompletedAndLastModified(Todo expectedTodo) {
         return new Todo(expectedTodo.getId(), expectedTodo.getText(), Boolean.TRUE,
-                expectedTodo.getCreatedAt(), getPresentDate(), null);
+                expectedTodo.getCreatedAt(), getPresentDate(), expectedTodo.getDueDate().get());
     }
 
     public static Todo copyCreateTodoChangingIsCompletedTextAndLastModified(Todo expectedTodo) {
         return new Todo(expectedTodo.getId(), MODIFIED_TODO_TEXT, Boolean.TRUE,
-                expectedTodo.getCreatedAt(), getPresentDate(), null);
+                expectedTodo.getCreatedAt(), getPresentDate(), expectedTodo.getDueDate().get());
     }
 
     public static Todo copyCreateTodoChangingDueDateTextAndLastModified(Todo expectedTodo) {
@@ -177,8 +220,12 @@ public final class TestTodoCreator {
                 createDueDateOfOneMonthFromCreationDate(expectedTodo.getCreatedAt()));
     }
 
+    public static Instant createDueDateOfOneMonthFromCreationDate(Instant createdAt) {
+        return createdAt.plus(30, ChronoUnit.DAYS);
+    }
+
     public static Todo copyCreateTodoWithModifiedText(Todo copyFrom, String text) {
         return new Todo(copyFrom.getId(), copyFrom.getText() + " " + text, copyFrom.getIsCompleted(),
-                copyFrom.getCreatedAt(), copyFrom.getLastModifiedAt(), copyFrom.getDueDate());
+                copyFrom.getCreatedAt(), copyFrom.getLastModifiedAt(), copyFrom.getDueDate().get());
     }
 }

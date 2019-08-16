@@ -22,13 +22,14 @@ import javax.ws.rs.core.*;
 import java.net.URI;
 import java.util.*;
 
+import static com.tryprospect.todo.utils.JSONTestUtils.TODO_TEMPLATE;
 import static com.tryprospect.todo.utils.TestTodoCreator.*;
 import static com.tryprospect.todo.validation.ValidationMessages.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
-
+// TODO: GO OVER TESTS AND REFACTOR/CLEAN-UP TO MAKE SURE THEY'RE RELEVANT.
 // TODO: look into a better way of organizing and cleaning up tests.
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class TodoResourceTest {
@@ -37,6 +38,8 @@ public class TodoResourceTest {
     private static Todo expectedTodo;
     private static URI baseTodoUri;
     private static URI uriWithId;
+    private static Response response;
+    private static Todo validTodoForCreate;
     private static final String INVALID_ID = "some_invalid_value_for_id";
     private static final TodoDAO MOCK_TODO_DAO = mock(TodoDAO.class);
     private static final Logger LOG = LoggerFactory.getLogger(TodoResourceTest.class);
@@ -44,76 +47,6 @@ public class TodoResourceTest {
                          ResourceExtension.builder()
                             .addResource(new TodoResource(MOCK_TODO_DAO))
                             .addProvider(StatusFilterFeature.class).build();
-
-
-    @BeforeEach
-    public void setUp() {
-        initTodo();
-    }
-
-    private static void initTodo() {
-        expectedTodo = TODO_TEMPLATE;
-        baseTodoUri = getBaseUriFromResource().build();
-        uriWithId = buildRequestUriWithIdInPath(expectedTodo.getId().toString());
-    }
-
-    private static UriBuilder getBaseUriFromResource() {
-        return UriBuilder.fromResource(TodoResource.class);
-    }
-
-    private static URI buildRequestUriWithIdInPath(String id) {
-        return getBaseUriFromResource().path("/{id}").build(id);
-    }
-
-    @AfterEach
-    public void tearDownAfterEach() {
-        reset(MOCK_TODO_DAO);
-    }
-
-    @Test
-    public void testCreateTodo_whenAllRequiredFieldsPresentThenNewTodoCreated() {
-        // given
-        String noErrorMsgExpected = "";
-        mockInsertMethodCall();
-        // when
-        Response response = makeRequestToCreateNewTodo(expectedTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.CREATED_201);
-        verifyInsertMethodWasCalledWithExpectedValue(expectedTodo);
-        verifyExpectedValueWasReturned(response, expectedTodo, noErrorMsgExpected);
-    }
-
-    private void mockInsertMethodCall() {
-        when(MOCK_TODO_DAO.insert(any())).thenReturn(expectedTodo);
-    }
-
-    private Response makeRequestToCreateNewTodo(Todo todoToCreate) {
-        return invokeForUri(baseTodoUri.getPath()).post(Entity.entity(todoToCreate, MediaType.APPLICATION_JSON_TYPE));
-    }
-
-    private static final Invocation.Builder invokeForUri(String uri) {
-        return getTargetForUri(uri).request().accept(MediaType.APPLICATION_JSON_TYPE);
-    }
-
-    private static final WebTarget getTargetForUri(String uri) {
-        return TODO_RESOURCE.target(uri);
-    }
-
-    private void verifyInsertMethodWasCalledWithExpectedValue(Todo insertedTodo) {
-        verify(MOCK_TODO_DAO).insert(todoInsertCaptor.capture());
-        assertThat(todoInsertCaptor.getValue()).isEqualTo(insertedTodo);
-    }
-
-    private void verifyExpectedValueWasReturned(Response response, Todo todoToCheck, String expectedErrMsg) {
-        assertThat(response.hasEntity()).isTrue();
-        ResponseObject responseObject = new ResponseObject(response, Todo.class);
-        if (responseObject.isError)
-            assertThat(responseObject.getErrorMsgFromResponse()).isEqualTo(expectedErrMsg);
-        else {
-            assertThat(responseObject.getResponseEntity().isPresent()).isTrue();
-            assertThat(responseObject.getResponseEntity().get()).isEqualToComparingFieldByField(todoToCheck);
-        }
-    }
 
     private class ResponseObject<T> {
         private static final String ERR_MSG_KEY = "errors";
@@ -156,17 +89,176 @@ public class TodoResourceTest {
         }
     }
 
+    @BeforeEach
+    public void setUp() {
+        initTodo();
+    }
+
+    private static void initTodo() {
+        expectedTodo = TODO_TEMPLATE;
+        baseTodoUri = getBaseUriFromResource().build();
+        uriWithId = buildRequestUriWithIdInPath(expectedTodo.getId().toString());
+    }
+
+    private static UriBuilder getBaseUriFromResource() {
+        return UriBuilder.fromResource(TodoResource.class);
+    }
+
+    private static URI buildRequestUriWithIdInPath(String id) {
+        return getBaseUriFromResource().path("/{id}").build(id);
+    }
+
+    @AfterEach
+    public void tearDownAfterEach() {
+        reset(MOCK_TODO_DAO);
+    }
+
     @Test
-    public void testCreateTodo_whenTodoTextIsBlankThen500returned() {
+    public void testCreateTodo_whenValidValuesReceivedThenCreatedStatusReturned() {
         // given
-        Todo todoWithBlankText = copyCreateNewTodoWithBlankText();
-        mockInsertMethodCallForTodoWithBlankText(todoWithBlankText);
+        mockInsertMethodCall();
         // when
-        Response response = makeRequestToCreateNewTodo(todoWithBlankText);
+        validTodoForCreate = copyCreateTodoForValidCreation();
+        response = makeRequestToCreateNewTodo(validTodoForCreate);
         // then
-        verifyInsertMethodWasCalledWithExpectedValue(todoWithBlankText);
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
-        verifyExpectedValueWasReturned(response, todoWithBlankText, "server response text may not be empty");   // TODO: add to validation messages?
+        verifyInsertMethodWasCalledWithExpectedValue(validTodoForCreate);
+        verifyExpectedResponseObject();
+        String noErrorMsgExpected = "";
+//        verifyExpectedValueWasReturned(response, expectedTodo, noErrorMsgExpected);
+    }
+
+    private void mockInsertMethodCall() {
+        when(MOCK_TODO_DAO.insert(any())).thenReturn(expectedTodo);
+    }
+
+    private Response  makeRequestToCreateNewTodo(Todo todoToCreate) {
+        return invokeForUri(baseTodoUri.getPath()).post(Entity.entity(todoToCreate, MediaType.APPLICATION_JSON_TYPE));
+    }
+
+    private static final Invocation.Builder invokeForUri(String uri) {
+        return getTargetForUri(uri).request().accept(MediaType.APPLICATION_JSON_TYPE);
+    }
+
+    private static final WebTarget getTargetForUri(String uri) {
+        return TODO_RESOURCE.target(uri);
+    }
+
+    private void verifyInsertMethodWasCalledWithExpectedValue(Todo insertedTodo) {
+        verify(MOCK_TODO_DAO).insert(todoInsertCaptor.capture());
+        assertThat(todoInsertCaptor.getValue()).isEqualTo(insertedTodo);
+    }
+
+    private void verifyExpectedResponseObject() {
+        verifyCreatedStatusReceived();
+        verifyExpectedTodoObject();
+    }
+
+    private void verifyCreatedStatusReceived() {
+        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.CREATED_201);
+    }
+
+    private void verifyExpectedTodoObject() {
+        Todo returnedTodo = getTodoObjectFromResponse();
+        checkThatFieldsOriginallyRequiredToBeNullNowHaveValues(returnedTodo);
+        checkThatRequiredFieldValuesHaveNotChanged(returnedTodo);
+    }
+
+    private Todo getTodoObjectFromResponse() {
+        ResponseObject responseObject = new ResponseObject(response, Todo.class);
+        return (Todo) responseObject.getResponseEntity().get();
+    }
+
+    private void checkThatFieldsOriginallyRequiredToBeNullNowHaveValues(Todo todoToCheck) {
+        assertThat(todoToCheck.getId()).isNotNull();
+        assertThat(todoToCheck.getCreatedAt()).isNotNull();
+        assertThat(todoToCheck.getLastModifiedAt()).isNotNull();
+    }
+
+    private void checkThatRequiredFieldValuesHaveNotChanged(Todo todoToCheck) {
+        assertThat(todoToCheck).isEqualToIgnoringGivenFields(expectedTodo, "id","createdAt","lastModifiedAt");
+    }
+
+    private void verifyExpectedValueWasReturned(Response response, Todo todoToCheck, String expectedErrMsg) {
+        assertThat(response.hasEntity()).isTrue();
+        ResponseObject responseObject = new ResponseObject(response, Todo.class);
+        if (responseObject.isError)
+            assertThat(responseObject.getErrorMsgFromResponse()).isEqualTo(expectedErrMsg);
+        else {
+            assertThat(responseObject.getResponseEntity().isPresent()).isTrue();
+            assertThat(responseObject.getResponseEntity().get()).isEqualToComparingFieldByField(todoToCheck);
+        }
+    }
+
+
+
+    @Test
+    public void testCreateTodo_whenIdIsNullThenUnprocessableEntityStatusReturned() {
+        // given
+        Todo newTodoWithNullId = copyCreateNewTodoWithNullId();
+        // when
+        Response response = makeRequestToCreateNewTodo(newTodoWithNullId);
+        // then
+        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY_422);
+    }
+
+    @Test
+    public void testCreateTodo_whenCreatedAtIsNullThenUnprocessableEntityStatusReturned() {
+        // given
+        Todo newTodoWithNullForCreatedAt = copyCreateNewTodoWithNullForCreatedAt();
+        // when
+        Response response = makeRequestToCreateNewTodo(newTodoWithNullForCreatedAt);
+        // then
+        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY_422);
+    }
+
+    @Test
+    public void testCreateTodo_whenModifiedAtIsNullThenUnprocessableEntityStatusReturned() {
+        // given
+        Todo newTodoWithNullForModifiedAt = copyCreateNewTodoWithNullForLastModifiedAt();
+        // when
+        Response response = makeRequestToCreateNewTodo(newTodoWithNullForModifiedAt);
+        // then
+        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY_422);
+    }
+
+    @Test
+    public void testCreateTodo_whenRequiredNullFieldsReceivedAndTextIsNullThenUnprocessableEntityStatusReturned() {
+        // given
+        Todo newTodoWithNullTextString= copyCreateTodoForValidCreationButWithNullText();
+        // when
+        Response response = makeRequestToCreateNewTodo(newTodoWithNullTextString);
+        // then
+        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY_422);
+    }
+
+    @Test
+    public void testCreateTodo_whenRequiredNullFieldsReceivedAndTextIsEmptyThenUnprocessableEntityStatusReturned() {
+        // given
+        Todo newTodoWithEmptyTextString = copyCreateTodoWithRequiredNullAndEmptyTextString();
+        // when
+        Response response = makeRequestToCreateNewTodo(newTodoWithEmptyTextString);
+        // then
+        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY_422);
+    }
+
+    @Test
+    public void testCreateTodo_whenRequiredNullFieldsReceivedAndIsCompletedIsNullThenUnprocessableEntityStatusReturned() {
+        // given
+        Todo invalidTodoForCreate = copyCreateTodoForValidCreationButWithNullIsCompleted();
+        // when
+        Response response = makeRequestToCreateNewTodo(invalidTodoForCreate);
+        // then
+        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY_422);
+    }
+
+    @Test
+    public void testCreateTodo_whenRequiredNullFieldsReceivedAndDueDateOptionalIsNullThenUnprocessableEntityStatusReturned() {
+        // given
+        Todo invalidTodoForCreate = copyCreateTodoForValidCreationButWithNullDueDate();
+        // when
+        Response response = makeRequestToCreateNewTodo(invalidTodoForCreate);
+        // then
+        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY_422);
     }
 
     private void mockInsertMethodCallForTodoWithBlankText(Todo todoToInsert) {
@@ -191,8 +283,9 @@ public class TodoResourceTest {
     public void testCreateTodo_whenNullTodoReturnedByDaoMethodThen500returned() {
         // given
         when(MOCK_TODO_DAO.insert(any())).thenReturn(null);
+        validTodoForCreate = copyCreateTodoForValidCreation();
         // when
-        Response response = makeRequestToCreateNewTodo(expectedTodo);
+        response = makeRequestToCreateNewTodo(validTodoForCreate);
         // then
         assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
         assertThat(responseMessage(response)).contains(NULL_TODO_RETURNED_ERROR_MSG_KEY);
@@ -203,8 +296,9 @@ public class TodoResourceTest {
         // given
         when(MOCK_TODO_DAO.insert((any())))
                 .thenThrow(UnableToExecuteStatementException.class);
+        validTodoForCreate = copyCreateTodoForValidCreation();
         // when
-        Response response = makeRequestToCreateNewTodo(expectedTodo);
+        response = makeRequestToCreateNewTodo(validTodoForCreate);
         // then
         assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
     }
@@ -229,7 +323,7 @@ public class TodoResourceTest {
     @Test
     public void testUpdateTodo_whenAllValuesValidIncludingFutureValueForDueDateThen204Returned() {
         // given
-        Todo validTodoWithFutureValueForDueDate = copyCreateNewTodoWithFutureValueForDueDate();
+        Todo validTodoWithFutureValueForDueDate = copyCreateTodoWithAllRequiredFieldsPresent();
         // when
         Response response = makeRequestToUpdateTodo(uriWithId.getPath(), validTodoWithFutureValueForDueDate);
         // then
@@ -344,7 +438,7 @@ public class TodoResourceTest {
     @Test
     public void testUpdateTodo_testValidForUpdateAnnotation_whenAllFieldsNonNullExceptDueDateThen204Returned() {
         // given/when
-        Todo todoAllFieldsNonNullExceptDueDate = copyCreateNewTodoAllFieldsNonNullExceptDueDate();
+        Todo todoAllFieldsNonNullExceptDueDate = copyCreateNewTodoAllFieldValuesPresentExceptDueDate();
         // when
         Response response = makeRequestToUpdateTodo(uriWithId.getPath(), todoAllFieldsNonNullExceptDueDate);
         // then

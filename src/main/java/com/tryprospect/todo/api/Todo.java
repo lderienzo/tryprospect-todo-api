@@ -1,21 +1,24 @@
 package com.tryprospect.todo.api;
 
+import static com.tryprospect.todo.validation.ValidationMessages.*;
+
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.Date;
+import java.util.Optional;
 import java.util.UUID;
 
-import javax.validation.constraints.Future;
 import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Past;
 
-import org.hibernate.validator.constraints.NotBlank;
+import org.hibernate.validator.constraints.NotEmpty;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Strings;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.tryprospect.todo.annotations.PresentOrPast;
+import com.tryprospect.todo.annotations.ValidateAfterDefaultConstraints;
+import com.tryprospect.todo.jackson.deserializer.TodoInstantDeserializer;
+import com.tryprospect.todo.jackson.serializer.NonOptionalInstantSerializer;
+import com.tryprospect.todo.jackson.serializer.OptionalInstantSerializer;
 
 import lombok.Data;
 
@@ -23,23 +26,35 @@ import lombok.Data;
 @Data
 public final class Todo {
 
-  @NotNull
+  @NotNull(message = "{" + TODO_ID_ERROR_MSG_PREFIX + "}" + "{" + NULL_FIELD_ERROR_MSG_KEY + "}")
   private UUID id;
 
-  @NotBlank
+  @NotEmpty(message = "{" + TODO_TEXT_ERROR_MSG_PREFIX + "}" + "{" + NULL_FIELD_ERROR_MSG_KEY + "}")
   private final String text;
 
-  @NotNull
+  @NotNull(message = "{" + TODO_IS_COMPLETED_ERROR_MSG_PREFIX + "}" + "{" + NULL_FIELD_ERROR_MSG_KEY + "}")
   private final Boolean isCompleted;
 
-  @PresentOrPast
-  private final Date createdAt; // TODO: Big priority -- should be LocalDateTime
+  @NotNull(message = "{" + TODO_CREATED_AT_ERROR_MSG_PREFIX + "}" + "{" + NULL_FIELD_ERROR_MSG_KEY + "}")
+  @PresentOrPast(message = "{" + TODO_CREATED_AT_ERROR_MSG_PREFIX + "}"
+          + "{" + PRESENT_OR_PAST_ERROR_MSG_KEY + "}", groups = {ValidateAfterDefaultConstraints.class})
+  @JsonProperty("created_at")
+  @JsonDeserialize(using = TodoInstantDeserializer.class, as = Instant.class)
+  @JsonSerialize(using = NonOptionalInstantSerializer.class)
+  private final Instant createdAt;
 
-  @PresentOrPast
-  private final Date lastModifiedAt;
+  @NotNull(message = "{" + TODO_LAST_MODIFIED_AT_ERROR_MSG_PREFIX + "}" + "{" + NULL_FIELD_ERROR_MSG_KEY + "}")
+//  @PastOrPresent
+  @JsonProperty("last_modified_at")
+  @JsonDeserialize(using = TodoInstantDeserializer.class, as = Instant.class)
+  @JsonSerialize(using = NonOptionalInstantSerializer.class)
+  private final Instant lastModifiedAt;
 
-  @Future
-  private final Date dueDate;
+//  @FutureOrPresent
+  @JsonProperty("due_date")
+  @JsonDeserialize(using = TodoInstantDeserializer.class, as = Instant.class)
+  @JsonSerialize(using = NonOptionalInstantSerializer.class)
+  private final Instant dueDate;
 
   public Todo(){
     this.id = null;
@@ -54,9 +69,9 @@ public final class Todo {
   public Todo(@JsonProperty("id") UUID id,
               @JsonProperty("text") String text,
               @JsonProperty("is_completed") Boolean isCompleted,
-              @JsonProperty("created_at") Date createdAt,
-              @JsonProperty("last_modified_at") Date lastModifiedAt,
-              @JsonProperty("due_date") Date dueDate) {
+              @JsonProperty("created_at") Instant createdAt,
+              @JsonProperty("last_modified_at") Instant lastModifiedAt,
+              @JsonProperty("due_date") Instant dueDate) {
 
     this.id = id;
     this.text = text;
@@ -64,19 +79,6 @@ public final class Todo {
     this.createdAt = createdAt;
     this.lastModifiedAt = lastModifiedAt;
     this.dueDate = dueDate;
-
-//    this.createdAt = convertToLocalDateTime(createdAt);
-//    this.lastModifiedAt = convertToLocalDateTime(lastModifiedAt);
-  }
-
-  private LocalDateTime convertToLocalDateTime(Date dateToConvert) {
-    return convertViaMilliseconds(dateToConvert);
-  }
-
-  private LocalDateTime convertViaMilliseconds(Date dateToConvert) {
-    return Instant.ofEpochMilli(dateToConvert.getTime())
-            .atZone(ZoneId.systemDefault())
-            .toLocalDateTime();
   }
 
   @JsonProperty
@@ -95,17 +97,18 @@ public final class Todo {
   }
 
   @JsonProperty("created_at")
-  public Date getCreatedAt() {
+  public Instant getCreatedAt() {
     return createdAt;
   }
 
   @JsonProperty("last_modified_at")
-  public Date getLastModifiedAt() {
+  public Instant getLastModifiedAt() {
     return lastModifiedAt;
   }
 
   @JsonProperty("due_date")
-  public Date getDueDate() {
-    return dueDate;
+  @JsonSerialize(using = OptionalInstantSerializer.class)
+  public Optional<Instant> getDueDate() {
+    return Optional.ofNullable(dueDate);
   }
 }

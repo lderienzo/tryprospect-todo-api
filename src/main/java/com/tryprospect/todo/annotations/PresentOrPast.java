@@ -5,13 +5,14 @@ import static java.lang.annotation.ElementType.*;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.Calendar;
-import java.util.Date;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 import javax.validation.Constraint;
 import javax.validation.ConstraintValidator;
 import javax.validation.ConstraintValidatorContext;
 import javax.validation.Payload;
+import javax.validation.constraints.Past;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,47 +24,43 @@ import org.slf4j.LoggerFactory;
 @Constraint(validatedBy = PresentOrPast.Validater.class)
 public @interface PresentOrPast {
 
-    String message() default "{annotations.PresentOrPast.message}";
+    String message() default "NO DEFAULT MESSAGE";
     Class<?>[] groups() default {};
     Class<? extends Payload>[] payload() default {};
 
-    class Validater implements ConstraintValidator<PresentOrPast, Date> {
+    class Validater implements ConstraintValidator<PresentOrPast, Instant> {
         private static final Logger LOG = LoggerFactory.getLogger(com.tryprospect.todo.annotations.PresentOrPast.Validater.class);
+        private String message;
 
         @Override
         public void initialize(PresentOrPast constraintAnnotation) {
+            this.message = constraintAnnotation.message();
         }
 
         @Override
-        public boolean isValid(Date dateInQuestion, ConstraintValidatorContext context) {
+        public boolean isValid(Instant dateInQuestion, ConstraintValidatorContext context) {
             boolean result = false;
-            if (dateInQuestion == null)   //TODO: look into why constraint composition @NotNull is not working.
-                return result;
+//            if (dateInQuestion == null)   //TODO: look into why constraint composition @NotNull is not working.
+//                return result;
             result = isPastDate(dateInQuestion);
             if (result == false)
                 result = presentIsNowGiveOrTakeAMinute(dateInQuestion);
             if (notValid(result)) {
                 context.disableDefaultConstraintViolation();
-                context.buildConstraintViolationWithTemplate("{annotations.PresentOrPast.message}").addConstraintViolation();
+                context.buildConstraintViolationWithTemplate(message).addConstraintViolation();
             }
             return result;
         }
 
-        private boolean isPastDate(Date date) {
-            return date.before(Calendar.getInstance().getTime());
+        private boolean isPastDate(Instant dateInQuestion) {
+            return dateInQuestion.isBefore(Instant.now());
         }
 
-        private boolean presentIsNowGiveOrTakeAMinute(Date date) {
+        private boolean presentIsNowGiveOrTakeAMinute(Instant dateInQuestion) {
             boolean result = false;
-            Calendar lowerThresholdOfPresent = Calendar.getInstance();
-            lowerThresholdOfPresent.add(Calendar.MINUTE, -1);
-            Calendar upperThresholdOfPresent = Calendar.getInstance();
-            upperThresholdOfPresent.add(Calendar.MINUTE, 1);
-
-            if (date.after(lowerThresholdOfPresent.getTime()) &&
-                    date.before(upperThresholdOfPresent.getTime()))
+            if (dateInQuestion.isAfter(Instant.now().minus(1, ChronoUnit.MINUTES)) &&
+                    dateInQuestion.isBefore(Instant.now().plus(1, ChronoUnit.MINUTES)))
                 result = true;
-
             return result;
         }
 

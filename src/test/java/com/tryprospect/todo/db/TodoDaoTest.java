@@ -1,7 +1,7 @@
 package com.tryprospect.todo.db;
 
+import static com.tryprospect.todo.utils.JSONTestUtils.TODO_TEMPLATE;
 import static com.tryprospect.todo.utils.TestTodoCreator.*;
-import static com.tryprospect.todo.utils.TestUtils.*;
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Java6Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -9,26 +9,30 @@ import static org.mockito.Mockito.*;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
 
 import org.flywaydb.core.Flyway;
 import org.jdbi.v3.core.Jdbi;
-import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
 import org.junit.jupiter.api.*;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.health.HealthCheckRegistry;
 import com.tryprospect.todo.api.Todo;
-import com.tryprospect.todo.utils.TestUtils;
+import com.tryprospect.todo.utils.JSONTestUtils;
 
 import io.dropwizard.db.DataSourceFactory;
 import io.dropwizard.jdbi3.JdbiFactory;
 import io.dropwizard.lifecycle.setup.LifecycleEnvironment;
 import io.dropwizard.setup.Environment;
 
+// TODO: GO OVER TESTS AND REFACTOR/CLEAN-UP TO MAKE SURE THEY'RE RELEVANT.
+// TODO: go through all tests and make sure they're not reporting false positives.
 public class TodoDaoTest {
 
 // TODO: See if we can get this working
@@ -40,6 +44,7 @@ public class TodoDaoTest {
     private static final DataSourceFactory DATA_SOURCE_FACTORY = TodoDaoTestConfiguration.getDataSourceFactory(POSTGRES);
     private static final Flyway FLYWAY = TodoDaoTestConfiguration.getFlywayDbMigrationObject(DATA_SOURCE_FACTORY);
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final LifecycleEnvironment LIFECYCLE_ENVIRONMENT = mock(LifecycleEnvironment.class);
     private static final HealthCheckRegistry HEALTH_CHECKS = mock(HealthCheckRegistry.class);
     private static final MetricRegistry METRIC_REGISTRY = new MetricRegistry();
@@ -102,21 +107,16 @@ public class TodoDaoTest {
     @Test
     public void testInsert_whenAllRequiredFieldsPresentThenNewTodoCreated() {
         // given
-        Date expectedLastModifiedDate = getPresentDate();
-        String expectedLastModifiedAt = removeSeconds(expectedLastModifiedDate);
-        String expectedCreatedAt = expectedLastModifiedAt;
+        Instant expectedCreatedAt = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        Instant expectedLastModifiedAt = expectedCreatedAt;
         // when
         Todo actualTodo = createTodo(TODO_TEMPLATE);
         // then
         assertThat(actualTodo.getCompleted()).isFalse();
         assertThat(actualTodo.getText()).isEqualTo(TODO_TEMPLATE.getText());
         assertThat(idIsValidUuid(actualTodo.getId().toString())).isTrue();
-        assertThat(removeSeconds(actualTodo.getCreatedAt())).isEqualTo(expectedCreatedAt);
-        assertThat(removeSeconds(actualTodo.getLastModifiedAt())).isEqualTo(expectedLastModifiedAt);
-    }
-
-    private String removeSeconds(Date dateToFormat) {
-        return DATE_FORMAT.format(dateToFormat);
+        assertThat(actualTodo.getCreatedAt().truncatedTo(ChronoUnit.DAYS)).isEqualTo(expectedCreatedAt);
+        assertThat(actualTodo.getLastModifiedAt().truncatedTo(ChronoUnit.DAYS)).isEqualTo(expectedLastModifiedAt);
     }
 
     private Todo createTodo(Todo todo) {
@@ -193,7 +193,7 @@ public class TodoDaoTest {
     @Test
     public void testFindById_whenInvalidIdPassedThenNothingFound() throws IOException {
         // given
-        Todo todoToFind = TestUtils.createTestTodoFromJson();
+        Todo todoToFind = JSONTestUtils.createTestTodoFromJson();
         // when
         Optional<Todo> todoFound = todoDAO.findById(todoToFind.getId());
         // then
@@ -214,7 +214,9 @@ public class TodoDaoTest {
     private void checkUpdateComparingLastModifedSeparately(Todo expectedTodo) {
         Todo updatedTodo = todoDAO.findById(expectedTodo.getId()).get();
         assertThat(updatedTodo).isEqualToIgnoringGivenFields(expectedTodo, "lastModifiedAt");
-        assertThat(removeSeconds(updatedTodo.getLastModifiedAt())).isEqualTo(removeSeconds(expectedTodo.getCreatedAt()));
+        assertThat(updatedTodo.getLastModifiedAt().truncatedTo(ChronoUnit.DAYS))
+                .isEqualTo(expectedTodo.getCreatedAt().truncatedTo(ChronoUnit.DAYS));
+        assertThat(updatedTodo.getDueDate().isPresent()).isFalse();
     }
 
     @Test
@@ -225,14 +227,17 @@ public class TodoDaoTest {
         // when
         todoDAO.update(expectedTodo);
         // then
-        checkUpdateComparingLastModifedAndDueDateSeparately(expectedTodo);
+        checkUpdateComparingLastModifiedAndDueDateSeparately(expectedTodo);
     }
 
-    private void checkUpdateComparingLastModifedAndDueDateSeparately(Todo expectedTodo) {
+    private void checkUpdateComparingLastModifiedAndDueDateSeparately(Todo expectedTodo) {
         Todo updatedTodo = todoDAO.findById(expectedTodo.getId()).get();
         assertThat(updatedTodo).isEqualToIgnoringGivenFields(expectedTodo, "lastModifiedAt", "dueDate");
-        assertThat(removeSeconds(updatedTodo.getLastModifiedAt())).isEqualTo(removeSeconds(expectedTodo.getCreatedAt()));
-        assertThat(removeSeconds(updatedTodo.getDueDate())).isEqualTo(removeSeconds(expectedTodo.getDueDate()));
+        assertThat(updatedTodo.getLastModifiedAt().truncatedTo(ChronoUnit.DAYS))
+                .isEqualTo(expectedTodo.getCreatedAt().truncatedTo(ChronoUnit.DAYS));
+        assertThat(updatedTodo.getDueDate().isPresent()).isTrue();
+        assertThat(updatedTodo.getDueDate().get().truncatedTo(ChronoUnit.DAYS))
+                .isEqualTo(expectedTodo.getDueDate().get().truncatedTo(ChronoUnit.DAYS));
     }
 
     @Test
@@ -265,7 +270,7 @@ public class TodoDaoTest {
         // when
         todoDAO.update(expectedTodo);
         // then
-        checkUpdateComparingLastModifedAndDueDateSeparately(expectedTodo);
+        checkUpdateComparingLastModifiedAndDueDateSeparately(expectedTodo);
     }
 
     @Test
@@ -276,7 +281,7 @@ public class TodoDaoTest {
         // when
         todoDAO.update(expectedTodo);
         // then
-        checkUpdateComparingLastModifedAndDueDateSeparately(expectedTodo);
+        checkUpdateComparingLastModifiedAndDueDateSeparately(expectedTodo);
     }
 
     @Test
@@ -287,7 +292,7 @@ public class TodoDaoTest {
         // when
         todoDAO.update(expectedTodo);
         // then
-        checkUpdateComparingLastModifedAndDueDateSeparately(expectedTodo);
+        checkUpdateComparingLastModifiedAndDueDateSeparately(expectedTodo);
     }
 
     @Test
@@ -315,7 +320,7 @@ public class TodoDaoTest {
     @Test
     public void testDeleteById_whenInvalidIdThenNothingDeleted() throws IOException {
         // given
-        Todo todoToDelete = TestUtils.createTestTodoFromJson();
+        Todo todoToDelete = JSONTestUtils.createTestTodoFromJson();
         // when
         todoDAO.deleteById(todoToDelete.getId());
         // then

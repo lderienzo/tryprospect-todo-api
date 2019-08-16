@@ -1,16 +1,18 @@
 package com.tryprospect.todo;
 
-import static com.tryprospect.todo.utils.TestTodoCreator.TODO_TEMPLATE;
+import static com.tryprospect.todo.utils.JSONTestUtils.TODO_TEMPLATE;
 import static com.tryprospect.todo.utils.TestTodoCreator.copyCreateNewTodoWithIsCompletedTrue;
 import static com.tryprospect.todo.utils.TestTodoCreator.copyCreateTodoWithDueDateValue;
 import static org.assertj.core.api.Java6Assertions.assertThat;
 
 import java.net.URI;
-import java.text.SimpleDateFormat;
-import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 import javax.ws.rs.client.Entity;
@@ -35,7 +37,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.tryprospect.todo.api.Todo;
 import com.tryprospect.todo.db.TodoDaoTestConfiguration;
 import com.tryprospect.todo.resources.TodoResource;
-import com.tryprospect.todo.utils.TestUtils;
+import com.tryprospect.todo.utils.JSONTestUtils;
 
 import io.dropwizard.testing.ConfigOverride;
 import io.dropwizard.testing.ResourceHelpers;
@@ -53,7 +55,9 @@ public class TodoIntegrationSmokeTest {
     private static Todo updatedTodo;
     private static final String NEW_TODO_IS_NULL_MSG = "New Todo is null.";
     private static final String UPDATED_TODO_IS_NULL_MSG = "Updated Todo is null.";
-    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT)
+                                                        .withLocale(Locale.US )
+                                                        .withZone(ZoneId.systemDefault());
     // TODO: figure out a way to perhaps use the main test-config.yml file. This statement references a copy in the tes resources folder.
     private static final String CONFIG_PATH = ResourceHelpers.resourceFilePath("test-config.yml");
     public static final PostgreSQLContainer POSTGRES = TodoDaoTestConfiguration.getRunningInstanceOfPostgres();
@@ -82,8 +86,7 @@ public class TodoIntegrationSmokeTest {
     @Order(1)
     public void testCreateTodo() {
         // given
-        Date expectedCreatedDateOfNow = Date.from(Clock.systemDefaultZone().instant());
-        String expectedCreatedAt = DATE_FORMAT.format(expectedCreatedDateOfNow);
+        String expectedCreatedAt = FORMATTER.format(Instant.now());
         String expectedLastModifiedAt = expectedCreatedAt;
         // when - make call to create new Todo.
         todo = makePostRequestToCreateNewTodo(relativeUri, TODO_TEMPLATE);
@@ -91,9 +94,9 @@ public class TodoIntegrationSmokeTest {
         assertThat(todo.getId()).isNotNull();
         assertThat(todo.getText()).isEqualTo(TODO_TEMPLATE.getText());
         assertThat(todo.getCompleted()).isFalse();
-        assertThat(todo.getDueDate()).isNull();
-        assertThat(DATE_FORMAT.format(todo.getCreatedAt())).isEqualTo(expectedCreatedAt);
-        assertThat(DATE_FORMAT.format(todo.getLastModifiedAt())).isEqualTo(expectedLastModifiedAt);
+        assertThat(todo.getDueDate().isPresent()).isFalse();
+        assertThat(FORMATTER.format(todo.getCreatedAt())).isEqualTo(expectedCreatedAt);
+        assertThat(FORMATTER.format(todo.getLastModifiedAt())).isEqualTo(expectedLastModifiedAt);
     }
 
     private Todo makePostRequestToCreateNewTodo(URI relativeUri, Todo todoToCreate) {
@@ -160,7 +163,7 @@ public class TodoIntegrationSmokeTest {
     }
 
     private String convertListToJsonString(List<Todo> todos) throws JsonProcessingException {
-        return TestUtils.OBJECT_MAPPER.writeValueAsString(todos);
+        return JSONTestUtils.OBJECT_MAPPER.writeValueAsString(todos);
     }
 
     @Test

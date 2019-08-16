@@ -4,7 +4,9 @@ package com.tryprospect.todo.resources;
 import static com.tryprospect.todo.validation.ValidationMessages.*;
 
 import com.tryprospect.todo.annotations.Status;
+import com.tryprospect.todo.annotations.TodoValidationSequence;
 import com.tryprospect.todo.annotations.ValidForUpdate;
+import com.tryprospect.todo.annotations.ValidateForCreation;
 import com.tryprospect.todo.api.Todo;
 import com.tryprospect.todo.db.TodoDAO;
 import com.tryprospect.todo.validation.ValidationMessages;
@@ -18,9 +20,10 @@ import java.util.*;
 
 import org.hibernate.validator.constraints.NotBlank;
 
+import io.dropwizard.validation.Validated;
+
 
 //TODO: BIG CHANGES
-// * change all Date objects to LocalDate/LocalDateTime?
 // * create ValidForCreation annotation
 // * refactor unit tests to use one set of code for client api request building and sending. better way to do integraton test?
 // * Implement new feature using NLP to infer due date
@@ -40,18 +43,18 @@ public class TodoResource {
   @Valid
   @Status(Status.CREATED)
   @NotNull(message = ValidationMessages.NULL_TODO_RETURNED_ERROR_MSG_KEY)
-  public Todo createTodo(Todo newTodo) {
+  public Todo createTodo(@ValidateForCreation Todo newTodo) {
     return todoDAO.insert(newTodo);
   }
 
   @PUT
   @Path("/{id}")
-  public void updateTodo(@ValidForUpdate @Valid Todo todo) {
+  public void updateTodo(@Validated(TodoValidationSequence.class) @Valid Todo todo) {
      todoDAO.update(todo);
   }
 
   @GET
-  @NotNull(message = NULL_LIST_OF_TODOS_RETURNED_ERROR_MSG_KEY)
+  @NotNull(message = NULL_LIST_OF_TODOS_RETURNED_ERROR_MSG_KEY)// TODO: Remove this. Add @Valid to return List<Todo>
   public List<Todo> getTodos() {
     return todoDAO.findAll();
   }
