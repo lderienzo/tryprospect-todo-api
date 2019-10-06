@@ -1,9 +1,17 @@
 package com.tryprospect.todo.db;
 
+import static com.tryprospect.todo.utils.yaml.ConfigYamlReader.CONFIG_YAML_FILE;
+import static com.tryprospect.todo.utils.yaml.DockerComposeYamlReader.DOCKER_COMPOSE_FILE;
+
 import org.flywaydb.core.Flyway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PostgreSQLContainer;
+
+import com.tryprospect.todo.db.jackson.Config;
+import com.tryprospect.todo.db.jackson.DockerCompose;
+import com.tryprospect.todo.utils.yaml.ConfigYamlReader;
+import com.tryprospect.todo.utils.yaml.DockerComposeYamlReader;
 
 import io.dropwizard.db.DataSourceFactory;
 
@@ -11,11 +19,31 @@ public final class TodoDaoTestConfiguration {
 
     private static final Logger LOG = LoggerFactory.getLogger(TodoDaoTestConfiguration.class);
 
-    public static final PostgreSQLContainer getRunningInstanceOfPostgres() {
-        // TODO: it would be great to read db config info from config.yml
-        final PostgreSQLContainer postgreSQLContainer = new PostgreSQLContainer();
+    public static final PostgreSQLContainer createRunningInstanceOfPostgres() {
+        PostgreSQLContainer postgreSQLContainer = createUsingInfoFromYamlFiles();
         postgreSQLContainer.start();
         return postgreSQLContainer;
+    }
+
+    private static PostgreSQLContainer createUsingInfoFromYamlFiles() {
+        Config config = getDbConnectionSettingsFromConfigYamlFile();
+        String dockerImageName = getDbImageNameFromDockerComposeYamlFile();
+        return createPostgresContainer(config, dockerImageName);
+    }
+
+    private static Config getDbConnectionSettingsFromConfigYamlFile() {
+        return new ConfigYamlReader().readObjectFromFile(CONFIG_YAML_FILE, Config.class);
+    }
+
+    private static String getDbImageNameFromDockerComposeYamlFile() {
+        return  new DockerComposeYamlReader()
+                .readObjectFromFile(DOCKER_COMPOSE_FILE, DockerCompose.class)
+                .getServices().getPostgres().getImage();
+    }
+
+    private static PostgreSQLContainer createPostgresContainer(Config config, String dockerImageName) {
+        return new PostgreSQLContainer(dockerImageName).withUsername(config.getDatabase().getUser())
+                .withPassword(config.getDatabase().getPassword()).withDatabaseName(config.getDatabase().getDbName());
     }
 
     public static final DataSourceFactory getDataSourceFactory(final PostgreSQLContainer container) {
@@ -39,10 +67,12 @@ public final class TodoDaoTestConfiguration {
         return dataSourceFactory;
     }
 
-    public static final Flyway getFlywayDbMigrationObject(final DataSourceFactory dataSourceFactory) {
-        Flyway flyway = new Flyway();
-        flyway.setDataSource(dataSourceFactory.getUrl(),
-                dataSourceFactory.getUser(), dataSourceFactory.getPassword());
+    public static final Flyway getFlywayForDataSource(final DataSourceFactory dsf) {
+        return setFlywayDataSource(new Flyway(), dsf);
+    }
+
+    private static Flyway setFlywayDataSource(Flyway flyway, DataSourceFactory dsf) {
+        flyway.setDataSource(dsf.getUrl(), dsf.getUser(), dsf.getPassword());
         return flyway;
     }
 }

@@ -1,11 +1,11 @@
-package com.tryprospect.todo.jackson;
+package com.tryprospect.todo.api.json;
 
-import static com.tryprospect.todo.utils.JSONTestUtils.*;
+import static com.tryprospect.todo.utils.json.JsonHandler.*;
 import static org.assertj.core.api.Java6Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-public class TodoJSONTest {
+public class TodoJsonReadingWritingTest {
 
     @Test
     public void testJsonSerializationDeserialization() {
