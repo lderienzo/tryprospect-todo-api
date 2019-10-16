@@ -1,6 +1,6 @@
 package com.tryprospect.todo.api.validation;
 
-import static com.tryprospect.todo.utils.TestTodoCreator.*;
+import static com.tryprospect.todo.utils.TodoCreator.*;
 import static com.tryprospect.todo.validation.ValidationMessages.VALID_FOR_UPDATE_DEFAULT_MSG_KEY;
 import static com.tryprospect.todo.validation.ValidationMessageHandler.getMessageFromPropertiesFile;
 import static org.assertj.core.api.Java6Assertions.assertThat;
@@ -32,7 +32,7 @@ public class TodoValidForUpdateTest extends CommonTodoTestMembers {
     @Test
     public void whenValidValuesPresentExcludingDueDateThenValid() {
         // given/when
-        validTodo = copyCreateTodoForUpdateExcludingDueDate();
+        validTodo = validForUpdateWithoutDueDate();
         // then
         assertThat(UPDATE_VALIDATOR.isValid(validTodo, constraintValidatorContext)).isTrue();
         assertThat(UPDATE_VALIDATOR.getMessage()).isEmpty();
@@ -41,7 +41,7 @@ public class TodoValidForUpdateTest extends CommonTodoTestMembers {
     @Test
     public void whenValidValuesPresentIncludingDueDateThenValid() {
         // given/when
-        validTodo = copyCreateTodoForUpdateIncludingDueDate();
+        validTodo = validForUpdateWithDueDate();
         // then
         assertThat(UPDATE_VALIDATOR.isValid(validTodo, constraintValidatorContext)).isTrue();
         assertThat(UPDATE_VALIDATOR.getMessage()).isEmpty();
@@ -50,7 +50,7 @@ public class TodoValidForUpdateTest extends CommonTodoTestMembers {
     @Test
     public void whenIdNullThenInvalid() {
         // given
-        invalidTodo = copyCreateNewTodoForUpdateWithNullId();
+        invalidTodo = invalidForUpdateWithNullId();
         // then
         assertInvalid();
     }
@@ -72,7 +72,7 @@ public class TodoValidForUpdateTest extends CommonTodoTestMembers {
     @Test
     public void whenTextNullThenInvalid() {
         // given
-        invalidTodo = copyCreateTodoForUpdateButTextNull();
+        invalidTodo = invalidForUpdateWithNullText();
         // then
         assertInvalid();
     }
@@ -80,7 +80,7 @@ public class TodoValidForUpdateTest extends CommonTodoTestMembers {
     @Test
     public void whenTextBlankThenInvalid() {
         // given
-        invalidTodo = copyCreateTodoForUpdateButTextBlank();
+        invalidTodo = invalidForUpdateWithBlankText();
         // then
         assertInvalid();
     }
@@ -88,7 +88,7 @@ public class TodoValidForUpdateTest extends CommonTodoTestMembers {
     @Test
     public void whenIsCompletedNullThenInvalid() {
         // given
-        invalidTodo = copyCreateTodoForUpdateIsCompletedNull();
+        invalidTodo = invalidForUpdateWithNullIsCompleted();
         // then
         assertInvalid();
     }
@@ -96,7 +96,7 @@ public class TodoValidForUpdateTest extends CommonTodoTestMembers {
     @Test
     public void whenCreatedAtNonNullThenInvalid() {
         // given
-        invalidTodo = copyCreateNewTodoForUpdateWithNonNullCreatedAt();
+        invalidTodo = invalidForUpdateWithNonNullCreatedAt();
         // then
         assertInvalid();
     }
@@ -104,7 +104,7 @@ public class TodoValidForUpdateTest extends CommonTodoTestMembers {
     @Test
     public void whenLastModifiedAtAtNonNullThenInvalid() {
         // given
-        invalidTodo = copyCreateNewTodoForUpdateWithNonNullLastModifiedAt();
+        invalidTodo = invalidForUpdateWithNonNullLastModifiedAt();
         // then
         assertInvalid();
     }

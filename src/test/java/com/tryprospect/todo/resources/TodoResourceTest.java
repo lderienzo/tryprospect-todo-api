@@ -10,6 +10,7 @@ import com.tryprospect.todo.exceptionmappers.TodoValidationExceptionMapper;
 
 import io.dropwizard.testing.junit5.DropwizardExtensionsSupport;
 import io.dropwizard.testing.junit5.ResourceExtension;
+import lombok.extern.slf4j.Slf4j;
 
 import org.eclipse.jetty.http.HttpStatus;
 import org.jdbi.v3.core.statement.UnableToExecuteStatementException;
@@ -26,7 +27,7 @@ import java.util.*;
 
 import static com.tryprospect.todo.exceptionmappers.JdbiExceptionMapper.UNABLE_TO_EXECUTE_STATEMENT_ERROR;
 import static com.tryprospect.todo.utils.json.JsonHandler.TODO_TEMPLATE;
-import static com.tryprospect.todo.utils.TestTodoCreator.*;
+import static com.tryprospect.todo.utils.TodoCreator.*;
 import static com.tryprospect.todo.validation.ValidationMessageHandler.getMessageFromPropertiesFile;
 import static com.tryprospect.todo.validation.ValidationMessages.*;
 
@@ -37,6 +38,7 @@ import static org.mockito.Mockito.*;
 // TODO: look into a better way of organizing and cleaning up tests.
 // TODO: The close() method should be invoked on all instances that contain an un-consumed entity input stream to ensure
 //  the resources associated with the instance are properly cleaned-up and prevent potential memory leaks.
+@Slf4j
 @ExtendWith(DropwizardExtensionsSupport.class)
 public class TodoResourceTest extends CommonTodoTestMembers {
 
@@ -81,87 +83,179 @@ public class TodoResourceTest extends CommonTodoTestMembers {
     }
 
 
+    @Nested
+    class testCreateTodo {
 
+        @Test
+        public void whenValidValuesReceivedExcludingDueDateThen201Status() {
+            // given
+            when(MOCK_TODO_DAO.insert(any())).thenReturn(expectedTodo);
+            validTodo = validForCreationWithoutDueDate();
+            // when
+            makeRequestToCreateNewTodo(validTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.CREATED_201);
+            verifyActualTodoAgainstExpected();
+        }
 
+        private void makeRequestToCreateNewTodo(Todo todoToCreate) {
+            response = invokeForUri(baseTodoUri.getPath()).post(Entity.json(todoToCreate));
+        }
 
-    @Test
-    public void testCreateTodo_whenValidValuesReceivedExcludingDueDateThen201Status() {
-        // given
-        mockInsertMethodCall();
-        validTodo = copyCreateTodoForValidCreationExcludingDueDate();
-        // when
-        response = makeRequestToCreateNewTodo(validTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.CREATED_201);
-        Optional<Todo> returnedTodo = getTodoObjectFromResponse();
-        assertThat(returnedTodo.isPresent()).isTrue();
-        assertThat(returnedTodo.get()).isEqualToComparingFieldByField(expectedTodo);
+        @Test
+        public void whenValidValuesReceivedIncludingDueDateThen201Status() {
+            // given
+            expectedTodo = expectedValidTodoWithValueForDueDate();
+            when(MOCK_TODO_DAO.insert(any())).thenReturn(expectedTodo);
+            // when
+            validTodo = validForCreationWithDueDate();
+            makeRequestToCreateNewTodo(validTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.CREATED_201);
+            verifyActualTodoAgainstExpected();
+        }
+
+        @Test
+        public void whenIdIsNonNullThen400Error() {
+            // given
+            invalidTodo = invalidForCreationWithNonNullId();
+            // when
+            makeRequestToCreateNewTodo(invalidTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
+            checkForAppropriateErrorMessage(VALID_FOR_CREATE_DEFAULT_MSG_KEY);
+        }
+
+        @Test
+        public void whenCreatedAtIsNonNullThen400Error() {
+            // given
+            invalidTodo = invalidForCreationWithNonNullCreatedAt();
+            // when
+            makeRequestToCreateNewTodo(invalidTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
+            checkForAppropriateErrorMessage(VALID_FOR_CREATE_DEFAULT_MSG_KEY);
+        }
+
+        @Test
+        public void whenLastModifiedAtIsNonNullThen400Error() {
+            // given
+            invalidTodo = invalidForCreationWithNonNullLastModifiedAt();
+            // when
+            makeRequestToCreateNewTodo(invalidTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
+            checkForAppropriateErrorMessage(VALID_FOR_CREATE_DEFAULT_MSG_KEY);
+        }
+
+        @Test
+        public void whenTextIsNullThen400Error() {
+            // given
+            invalidTodo = invalidForCreationWithNullText();
+            // when
+            makeRequestToCreateNewTodo(invalidTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
+            checkForAppropriateErrorMessage(VALID_FOR_CREATE_DEFAULT_MSG_KEY);
+        }
+
+        @Test
+        public void whenTextIsEmptyThen400Error() {
+            // given
+            invalidTodo = invalidForCreationWithBlankText();
+            // when
+            makeRequestToCreateNewTodo(invalidTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
+            checkForAppropriateErrorMessage(VALID_FOR_CREATE_DEFAULT_MSG_KEY);
+        }
+
+        @Test
+        public void whenIsCompletedIsNullThen400Error() {
+            // given
+            invalidTodo = invalidForCreateWithNullIsCompleted();
+            // when
+            makeRequestToCreateNewTodo(invalidTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
+            checkForAppropriateErrorMessage(VALID_FOR_CREATE_DEFAULT_MSG_KEY);
+        }
+
+        @Test
+        public void whenNullTodoReturnedByDaoMethodThen500Error() {
+            // given
+            when(MOCK_TODO_DAO.insert(any())).thenReturn(null);
+            validTodo = validForCreationWithoutDueDate();
+            // when
+            makeRequestToCreateNewTodo(validTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
+            checkForAppropriateErrorMessage(NULL_TODO_RETURNED_ERROR_MSG_KEY);
+        }
+
+        @Test
+        public void whenInvalidTodoReturnedThen500Error() {
+            // given
+            validTodo = validForCreationWithoutDueDate();
+            invalidTodo = returnedInvalidTodoWithNullId();
+            when(MOCK_TODO_DAO.insert(any())).thenReturn(invalidTodo);
+            // when
+            makeRequestToCreateNewTodo(validTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
+            checkForAppropriateErrorMessage(TODO_ID_ERROR_MSG_PREFIX_KEY, NULL_FIELD_ERROR_MSG_KEY);
+        }
+
+        @Test
+        public void whenDaoMethodThrowsExceptionThen500Error() {
+            // given
+            when(MOCK_TODO_DAO.insert((any()))).thenThrow(UnableToExecuteStatementException.class);
+            validTodo = validForCreationWithoutDueDate();
+            // when
+            makeRequestToCreateNewTodo(validTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
+            assertThat(getResponseMessage()).isEqualTo(UNABLE_TO_EXECUTE_STATEMENT_ERROR);
+        }
     }
 
-    private void mockInsertMethodCall() {
-        when(MOCK_TODO_DAO.insert(any())).thenReturn(expectedTodo);
-    }
-
-    private Response makeRequestToCreateNewTodo(Todo todoToCreate) {
-        return invokeForUri(baseTodoUri.getPath()).post(Entity.entity(todoToCreate, MediaType.APPLICATION_JSON_TYPE));
-    }
-
-    private static final Invocation.Builder invokeForUri(String uri) {
+    private final Invocation.Builder invokeForUri(String uri) {
         return getTargetForUri(uri).request().accept(MediaType.APPLICATION_JSON_TYPE);
     }
 
-    private static final WebTarget getTargetForUri(String uri) {
+    private final WebTarget getTargetForUri(String uri) {
         return TODO_RESOURCE.target(uri);
     }
 
-    // TODO: REPEATED CODE!! SHAME!
-    private Optional<Todo> getTodoObjectFromResponse() {
-        Optional<Todo> readObject = Optional.empty();
-        try {
-            readObject = Optional.of(response.readEntity(Todo.class));
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            response.close();
-        }
-        return readObject;
+    private int responseStatusCode() {
+        return response.getStatusInfo().getStatusCode();
     }
 
-    @Test
-    public void testCreateTodo_whenValidValuesReceivedIncludingDueDateThen201Status() {
-        // given
-        expectedTodo = copyCreateNewTodoWithValueForDueDate();
-        mockInsertMethodCall();
-        // when
-        validTodo = copyCreateTodoForValidCreationIncludingDueDate();
-        response = makeRequestToCreateNewTodo(validTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.CREATED_201);
-        Optional<Todo> returnedTodo = getTodoObjectFromResponse();
-        assertThat(returnedTodo.isPresent()).isTrue();
-        assertThat(returnedTodo.get()).isEqualToComparingFieldByField(expectedTodo);
-    }
-
-    @Test
-    public void testCreateTodo_whenIdIsNonNullThen400Error() {
-        // given
-        invalidTodo = copyCreateTodoForValidCreationButWithNonNullId();
-        // when
-        response = makeRequestToCreateNewTodo(invalidTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
-        checkForAppropriateErrorMessage(VALID_FOR_CREATE_DEFAULT_MSG_KEY);
+    private void verifyActualTodoAgainstExpected() {
+        Optional<Todo> actualTodo = Optional.of(response.readEntity(Todo.class));
+        assertThat(actualTodo.isPresent()).isTrue();
+        assertThat(actualTodo.get()).isEqualToComparingFieldByField(expectedTodo);
     }
 
     private void checkForAppropriateErrorMessage(String... expectedMessageKeys) {
         String actualMessageReceived = getResponseMessage();
         assertThat(actualMessageReceived).isNotEmpty();
         String expectedMessage;
-        if (onlyOneMessageKeyPresent(expectedMessageKeys))
-            expectedMessage = getMessageFromPropertiesFile(expectedMessageKeys[0]);
-        else
-            expectedMessage = concatenateMultipleMessages(expectedMessageKeys);
+        if (onlyOneMessageKeyPresent(expectedMessageKeys)) expectedMessage =
+                getMessageFromPropertiesFile(expectedMessageKeys[0]);
+        else expectedMessage = concatenateMultipleMessages(expectedMessageKeys);
         assertThat(actualMessageReceived).isEqualTo(expectedMessage);
+    }
+
+    private String getResponseMessage() {
+        Optional<String> entityOptional = Optional.empty();
+        try {
+            response.bufferEntity();
+            entityOptional = Optional.of(response.readEntity(String.class));
+        } catch (ProcessingException e) {
+            LOG.error(e, () -> "Could not read entity from response.");
+        }
+        return entityOptional.orElse("");
     }
 
     private boolean onlyOneMessageKeyPresent(String... expectedMessageKeys) {
@@ -180,443 +274,303 @@ public class TodoResourceTest extends CommonTodoTestMembers {
     private String insertSpaceAfterFirstStringButNotAfterLast(int index, String[] array) {
         return (index > 0 && index == array.length ? " " : "");
     }
+    
+    @Nested
+    class testUpdateTodo {
 
-    @Test
-    public void testCreateTodo_whenCreatedAtIsNonNullThen400Error() {
-        // given
-        invalidTodo = copyCreateTodoForCreationWithNonNullCreatedAt();
-        // when
-        response = makeRequestToCreateNewTodo(invalidTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
-        checkForAppropriateErrorMessage(VALID_FOR_CREATE_DEFAULT_MSG_KEY);
-    }
-
-    @Test
-    public void testCreateTodo_whenLastModifiedAtIsNonNullThen400Error() {
-        // given
-        invalidTodo = copyCreateTodoForCreationWithNonNullLastModifiedAt();
-        // when
-        response = makeRequestToCreateNewTodo(invalidTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
-        checkForAppropriateErrorMessage(VALID_FOR_CREATE_DEFAULT_MSG_KEY);
-    }
-
-    @Test
-    public void testCreateTodo_whenTextIsNullThen400Error() {
-        // given
-        invalidTodo = copyCreateTodoForCreationWithNullText();
-        // when
-        response = makeRequestToCreateNewTodo(invalidTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
-        checkForAppropriateErrorMessage(VALID_FOR_CREATE_DEFAULT_MSG_KEY);
-    }
-
-    @Test
-    public void testCreateTodo_whenTextIsEmptyThen400Error() {
-        // given
-        invalidTodo = copyCreateTodoForCreationWithEmptyText();
-        // when
-        response = makeRequestToCreateNewTodo(invalidTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
-        checkForAppropriateErrorMessage(VALID_FOR_CREATE_DEFAULT_MSG_KEY);
-    }
-
-    @Test
-    public void testCreateTodo_whenIsCompletedIsNullThen400Error() {
-        // given
-        invalidTodo = copyCreateTodoForValidCreationButWithNullIsCompleted();
-        // when
-        response = makeRequestToCreateNewTodo(invalidTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
-        checkForAppropriateErrorMessage(VALID_FOR_CREATE_DEFAULT_MSG_KEY);
-    }
-
-    @Test
-    public void testCreateTodo_whenNullTodoReturnedByDaoMethodThen500Error() {
-        // given
-        when(MOCK_TODO_DAO.insert(any())).thenReturn(null);
-        validTodo = copyCreateTodoForValidCreationExcludingDueDate();
-        // when
-        response = makeRequestToCreateNewTodo(validTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
-        checkForAppropriateErrorMessage(NULL_TODO_RETURNED_ERROR_MSG_KEY);
-    }
-
-    private String getResponseMessage() {
-        Optional<String> entityOptional = Optional.empty();
-        try {
-            response.bufferEntity();
-            entityOptional = Optional.of(response.readEntity(String.class));
-        } catch (ProcessingException e) {
-            LOG.error(e, () -> "Could not read entity from response.");
+        @Test
+        public void whenValidValuesPresentExcludingDueDateThen204Status() {
+            validTodo = validForUpdateWithoutDueDate();
+            // when
+            makeRequestToUpdateTodo(uriWithId.getPath(), validTodo);
+            // then
+            verifyDaoUpdateMethodWasCalledWithCorrectValue(validTodo);
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.NO_CONTENT_204);
         }
-        return entityOptional.orElse("");
-    }
 
-    @Test
-    public void testCreateTodo_whenInvalidTodoReturnedThen500Error() {
-        // given
-        validTodo = copyCreateTodoForValidCreationExcludingDueDate();
-        invalidTodo = copyCreateNewTodoWithNullId();
-        when(MOCK_TODO_DAO.insert(any())).thenReturn(invalidTodo);
-        // when
-        response = makeRequestToCreateNewTodo(validTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
-        checkForAppropriateErrorMessage(TODO_ID_ERROR_MSG_PREFIX_KEY, NULL_FIELD_ERROR_MSG_KEY);
-    }
-
-    @Test
-    public void testCreateTodo_whenDaoMethodThrowsExceptionThen500Error() {
-        // given
-        when(MOCK_TODO_DAO.insert((any()))).thenThrow(UnableToExecuteStatementException.class);
-        validTodo = copyCreateTodoForValidCreationExcludingDueDate();
-        // when
-        response = makeRequestToCreateNewTodo(validTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
-        assertThat(getResponseMessage()).isEqualTo(UNABLE_TO_EXECUTE_STATEMENT_ERROR);
-    }
-
-
-
-
-
-    @Test
-    public void testUpdateTodo_whenValidValuesPresentExcludingDueDateThen204Status() {
-        validTodo = copyCreateTodoForUpdateExcludingDueDate();
-        // when
-        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), validTodo);
-        // then
-        verifyDaoUpdateMethodWasCalledWithCorrectValue(validTodo);
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT_204);
-    }
-
-    private Response makeRequestToUpdateTodo(String uri, Todo todoToUpdate) {
-        return invokeForUri(uri).put(Entity.entity(todoToUpdate, MediaType.APPLICATION_JSON_TYPE));
-    }
-
-    private void verifyDaoUpdateMethodWasCalledWithCorrectValue(Todo expectedTodo) {
-        verify(MOCK_TODO_DAO, times(1)).update(expectedTodo);
-    }
-
-    @Test
-    public void testUpdateTodo_whenValidValuesPresentIncludingDueDateThen204Status() {
-        // given
-        validTodo = copyCreateTodoForUpdateIncludingDueDate();
-        // when
-        Response response = makeRequestToUpdateTodo(uriWithId.getPath(), validTodo);
-        // then
-        verifyDaoUpdateMethodWasCalledWithCorrectValue(validTodo);
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT_204);
-    }
-
-    @Test
-    public void testUpdateTodo_whenIdNullThen400Error() {
-        // given
-        invalidTodo = copyCreateNewTodoForUpdateWithNullId();
-        // when
-        response = makeRequestToUpdateTodo(uriWithId.getPath(), invalidTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
-        checkForAppropriateErrorMessage(VALID_FOR_UPDATE_DEFAULT_MSG_KEY);
-    }
-
-    @Test
-    public void testUpdateTodo_whenTextNullThen400Error() {
-        // given
-        invalidTodo = copyCreateTodoForUpdateButTextNull();
-        // when
-        response = makeRequestToUpdateTodo(uriWithId.getPath(), invalidTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
-        checkForAppropriateErrorMessage(VALID_FOR_UPDATE_DEFAULT_MSG_KEY);
-    }
-
-    @Test
-    public void testUpdateTodo_whenTextBlankThen400Error() {
-        // given
-        invalidTodo = copyCreateTodoForUpdateButTextBlank();
-        // when
-        response = makeRequestToUpdateTodo(uriWithId.getPath(), invalidTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
-        checkForAppropriateErrorMessage(VALID_FOR_UPDATE_DEFAULT_MSG_KEY);
-    }
-
-    @Test
-    public void testUpdateTodo_whenIsCompletedNullThen400Error() {
-        // given
-        invalidTodo = copyCreateTodoForUpdateIsCompletedNull();
-        // when
-        response = makeRequestToUpdateTodo(uriWithId.getPath(), invalidTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
-        checkForAppropriateErrorMessage(VALID_FOR_UPDATE_DEFAULT_MSG_KEY);
-    }
-
-    @Test
-    public void testUpdateTodo_whenCreatedAtNonNullThen400Error() {
-        // given
-        invalidTodo = copyCreateNewTodoForUpdateWithNonNullCreatedAt();
-        // when
-        response = makeRequestToUpdateTodo(uriWithId.getPath(), invalidTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
-        checkForAppropriateErrorMessage(VALID_FOR_UPDATE_DEFAULT_MSG_KEY);
-    }
-
-    @Test
-    public void testUpdateTodo_whenLastModifiedAtNonNullThen400Error() {
-        // given
-        invalidTodo = copyCreateNewTodoForUpdateWithNonNullLastModifiedAt();
-        // when
-        response = makeRequestToUpdateTodo(uriWithId.getPath(), invalidTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
-        checkForAppropriateErrorMessage(VALID_FOR_UPDATE_DEFAULT_MSG_KEY);
-    }
-
-    @Test
-    public void testUpdateTodo_whenDaoMethodThrowsExceptionThen500Error() {
-        // given
-        doThrow(UnableToExecuteStatementException.class).when(MOCK_TODO_DAO).update(any());
-        validTodo = copyCreateTodoForUpdateExcludingDueDate();
-        // when
-        response = makeRequestToUpdateTodo(uriWithId.getPath(), validTodo);
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
-        assertThat(getResponseMessage()).isEqualTo(UNABLE_TO_EXECUTE_STATEMENT_ERROR);
-    }
-
-
-
-
-    // here
-    @Test
-    public void testGetTodo_whenValidIdPassedThenCorrectTodoFoundWith200Status() {
-        // given
-        when(MOCK_TODO_DAO.findById(expectedTodo.getId())).thenReturn(Optional.of(expectedTodo));
-        // when
-        response = makeGetRequestToReturnResponse(uriWithId.getPath());
-        Optional<Todo> returnedTodoOptional = getTodoObjectFromResponse();
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.OK_200);
-        assertThat(returnedTodoOptional.isPresent()).isTrue();
-        assertThat(returnedTodoOptional.get()).isEqualToComparingFieldByField(expectedTodo);
-    }
-
-    private Response makeGetRequestToReturnResponse(String uri) {
-        return invokeForUri(uri).get();
-    }
-
-    @Test
-    public void testGetTodo_whenInvalidIdPassedThen404Error() {
-        // given
-        uriWithId = buildRequestUriWithIdInPath(INVALID_ID);
-        // when
-        response = makeRequestToReturnResponse(uriWithId.getPath());
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND_404);
-    }
-
-    @Test
-    public void testGetTodo_whenDaoMethodThrowsExceptionThen500Error() {
-        // given
-        when(MOCK_TODO_DAO.findById(expectedTodo.getId()))
-                .thenThrow(UnableToExecuteStatementException.class);
-        // when
-        response = makeRequestToReturnResponse(uriWithId.getPath());
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
-        assertThat(getResponseMessage()).isEqualTo(UNABLE_TO_EXECUTE_STATEMENT_ERROR);
-    }
-
-    @Test
-    public void testGetTodo_whenNullValueReturnedByDaoMethodThen204Status() {
-        // given
-        when(MOCK_TODO_DAO.findById(expectedTodo.getId())).thenReturn(null);
-        // when
-        Response response = makeRequestToReturnResponse(uriWithId.getPath());
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT_204);
-    }
-
-    @Test
-    public void testGetTodo_whenInvalidTodoReturnedThen500Error() {
-        // given
-        invalidTodo = copyCreateNewTodoWithNullId();
-        when(MOCK_TODO_DAO.findById(expectedTodo.getId())).thenReturn(Optional.of(invalidTodo));
-        // when
-        response = makeRequestToReturnResponse(uriWithId.getPath());
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
-        checkForAppropriateErrorMessage(TODO_ID_ERROR_MSG_PREFIX_KEY, NULL_FIELD_ERROR_MSG_KEY);
-    }
-
-
-
-
-
-    @Test
-    public void testGetTodoS_whenCalledNormallyThenExpectedListReturnedWith200Status() {
-        // given
-        List<Todo> expectedTodos = createListOfSingleTodo();
-        mockFindAllMethodCallToReturnExpectedListOfTodos(expectedTodos);
-        // when
-        response = makeGetRequestToReturnResponse(baseTodoUri.getPath());
-        List<Todo> returnedTodos = getListOfTodosFromResponse();
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.OK_200);
-        assertThat(returnedTodos).containsAll(expectedTodos);
-    }
-
-    private List<Todo> getListOfTodosFromResponse() {
-        List<Todo> readObject = null;
-        try {
-            readObject = response.readEntity(new GenericType<List<Todo>>() {});
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            response.close();
+        private void makeRequestToUpdateTodo(String uri, Todo todoToUpdate) {
+            response = invokeForUri(uri).put(Entity.entity(todoToUpdate, MediaType.APPLICATION_JSON_TYPE));
         }
-        return readObject;
-    }
 
-    // TODO: COME BACK... FRIED RIGHT NOW.
-    private <T> T getObjectFromResponse(Class<?> cls) {
-        T readObject = null;
-        try {
-            readObject = (T) response.readEntity(cls);
-        } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            response.close();
+        private void verifyDaoUpdateMethodWasCalledWithCorrectValue(Todo expectedTodo) {
+            verify(MOCK_TODO_DAO, times(1)).update(expectedTodo);
         }
-        return readObject;
+
+        @Test
+        public void whenValidValuesPresentIncludingDueDateThen204Status() {
+            // given
+            validTodo = validForUpdateWithDueDate();
+            // when
+            makeRequestToUpdateTodo(uriWithId.getPath(), validTodo);
+            // then
+            verifyDaoUpdateMethodWasCalledWithCorrectValue(validTodo);
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.NO_CONTENT_204);
+        }
+
+        @Test
+        public void whenIdNullThen400Error() {
+            // given
+            invalidTodo = invalidForUpdateWithNullId();
+            // when
+            makeRequestToUpdateTodo(uriWithId.getPath(), invalidTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
+            checkForAppropriateErrorMessage(VALID_FOR_UPDATE_DEFAULT_MSG_KEY);
+        }
+
+        @Test
+        public void whenTextNullThen400Error() {
+            // given
+            invalidTodo = invalidForUpdateWithNullText();
+            // when
+            makeRequestToUpdateTodo(uriWithId.getPath(), invalidTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
+            checkForAppropriateErrorMessage(VALID_FOR_UPDATE_DEFAULT_MSG_KEY);
+        }
+
+        @Test
+        public void whenTextBlankThen400Error() {
+            // given
+            invalidTodo = invalidForUpdateWithBlankText();
+            // when
+            makeRequestToUpdateTodo(uriWithId.getPath(), invalidTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
+            checkForAppropriateErrorMessage(VALID_FOR_UPDATE_DEFAULT_MSG_KEY);
+        }
+
+        @Test
+        public void whenIsCompletedNullThen400Error() {
+            // given
+            invalidTodo = invalidForUpdateWithNullIsCompleted();
+            // when
+            makeRequestToUpdateTodo(uriWithId.getPath(), invalidTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
+            checkForAppropriateErrorMessage(VALID_FOR_UPDATE_DEFAULT_MSG_KEY);
+        }
+
+        @Test
+        public void whenCreatedAtNonNullThen400Error() {
+            // given
+            invalidTodo = invalidForUpdateWithNonNullCreatedAt();
+            // when
+            makeRequestToUpdateTodo(uriWithId.getPath(), invalidTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
+            checkForAppropriateErrorMessage(VALID_FOR_UPDATE_DEFAULT_MSG_KEY);
+        }
+
+        @Test
+        public void whenLastModifiedAtNonNullThen400Error() {
+            // given
+            invalidTodo = invalidForUpdateWithNonNullLastModifiedAt();
+            // when
+            makeRequestToUpdateTodo(uriWithId.getPath(), invalidTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST_400);
+            checkForAppropriateErrorMessage(VALID_FOR_UPDATE_DEFAULT_MSG_KEY);
+        }
+
+        @Test
+        public void whenDaoMethodThrowsExceptionThen500Error() {
+            // given
+            doThrow(UnableToExecuteStatementException.class).when(MOCK_TODO_DAO).update(any());
+            validTodo = validForUpdateWithoutDueDate();
+            // when
+            makeRequestToUpdateTodo(uriWithId.getPath(), validTodo);
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
+            assertThat(getResponseMessage()).isEqualTo(UNABLE_TO_EXECUTE_STATEMENT_ERROR);
+        }
     }
 
-    private List<Todo> createListOfSingleTodo() {
-        return Collections.singletonList(expectedTodo);
+    @Nested
+    class testGetTodo {
+
+        @Test
+        public void whenValidIdPassedThenCorrectTodoFoundWith200Status() {
+            // given
+            when(MOCK_TODO_DAO.findById(expectedTodo.getId())).thenReturn(Optional.of(expectedTodo));
+            // when
+            makeGetRequest(uriWithId.getPath());
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.OK_200);
+            verifyActualTodoAgainstExpected();
+        }
+
+        @Test
+        public void whenInvalidIdPassedThen404Error() {
+            // given
+            uriWithId = buildRequestUriWithIdInPath(INVALID_ID);
+            // when
+            makeGetRequest(uriWithId.getPath());
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.NOT_FOUND_404);
+        }
+
+        @Test
+        public void whenDaoMethodThrowsExceptionThen500Error() {
+            // given
+            when(MOCK_TODO_DAO.findById(expectedTodo.getId()))
+                    .thenThrow(UnableToExecuteStatementException.class);
+            // when
+            makeGetRequest(uriWithId.getPath());
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
+            assertThat(getResponseMessage()).isEqualTo(UNABLE_TO_EXECUTE_STATEMENT_ERROR);
+        }
+
+        @Test
+        public void whenNullValueReturnedByDaoMethodThen204Status() {
+            // given
+            when(MOCK_TODO_DAO.findById(expectedTodo.getId())).thenReturn(null);
+            // when
+            makeGetRequest(uriWithId.getPath());
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.NO_CONTENT_204);
+        }
+
+        @Test
+        public void whenInvalidTodoReturnedThen500Error() {
+            // given
+            invalidTodo = returnedInvalidTodoWithNullId();
+            when(MOCK_TODO_DAO.findById(expectedTodo.getId())).thenReturn(Optional.of(invalidTodo));
+            // when
+            makeGetRequest(uriWithId.getPath());
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
+            checkForAppropriateErrorMessage(TODO_ID_ERROR_MSG_PREFIX_KEY, NULL_FIELD_ERROR_MSG_KEY);
+        }
     }
 
-    private void mockFindAllMethodCallToReturnExpectedListOfTodos(List<Todo> todos) {
-        when(MOCK_TODO_DAO.findAll()).thenReturn(todos);
+    private void makeGetRequest(String uri) {
+        response = invokeForUri(uri).get();
     }
 
-    private List<Todo> makeRequestToReturnList(String uri) {
-        return invokeForUri(uri).get(new GenericType<List<Todo>>() {});
+    @Nested
+    class testGetTodos {
+
+        @Test
+        public void whenCalledNormallyThenExpectedListReturnedWith200Status() {
+            // given
+            List<Todo> expectedTodos = createListOfSingleTodo();
+            mockFindAllMethodCallToReturnExpectedListOfTodos(expectedTodos);
+            // when
+            makeGetRequest(baseTodoUri.getPath());
+            List<Todo> actualTodoListReturned = response.readEntity(new GenericType<List<Todo>>() {
+            });
+            ;
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.OK_200);
+            assertThat(actualTodoListReturned).containsAll(expectedTodos);
+        }
+
+        private List<Todo> createListOfSingleTodo() {
+            return Collections.singletonList(expectedTodo);
+        }
+
+        private void mockFindAllMethodCallToReturnExpectedListOfTodos(List<Todo> todos) {
+            when(MOCK_TODO_DAO.findAll()).thenReturn(todos);
+        }
+
+        @Test
+        public void whenInvalidTodoPresentInListThen500Error() {
+            // given
+            List<Todo> expectedTodos = createListOfSingleInvalidTodo();
+            mockFindAllMethodCallToReturnExpectedListOfTodos(expectedTodos);
+            // when
+            makeGetRequest(baseTodoUri.getPath());
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
+            assertThat(getResponseMessage()).isEqualTo(constructExpectedErrorMessage());
+        }
+
+        private String constructExpectedErrorMessage() {
+            return getMessageFromPropertiesFile(INVALID_TODO_PRESENT_IN_RETURN_LIST_MSG_KEY)
+                    + " " + getMessageFromPropertiesFile(TODO_ID_ERROR_MSG_PREFIX_KEY)
+                    + getMessageFromPropertiesFile(NULL_FIELD_ERROR_MSG_KEY);
+        }
+
+        private List<Todo> createListOfSingleInvalidTodo() {
+            invalidTodo = returnedInvalidTodoWithNullId();
+            return Collections.singletonList(invalidTodo);
+        }
+
+        @Test
+        public void whenNullListReturnedFromDaoMethodThen500Error() {
+            //given/when
+            mockFindAllMethodCallToReturnExpectedListOfTodos(null);
+            // when
+            makeGetRequest(baseTodoUri.getPath());
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
+            checkForAppropriateErrorMessage(NULL_LIST_OF_TODOS_RETURNED_ERROR_MSG_KEY);
+        }
+
+        @Test
+        public void whenDaoMethodThrowsExceptionThen500Error() {
+            // given
+            when(MOCK_TODO_DAO.findAll()).thenThrow(UnableToExecuteStatementException.class);
+            // when
+            makeGetRequest(baseTodoUri.getPath());
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
+            assertThat(getResponseMessage()).isEqualTo(UNABLE_TO_EXECUTE_STATEMENT_ERROR);
+        }
     }
 
-    @Test
-    public void testGetTodoS_whenInvalidTodoPresentInListThen500Error() {
-        // given
-        List<Todo> expectedTodos = createListOfSingleInvalidTodo();
-        mockFindAllMethodCallToReturnExpectedListOfTodos(expectedTodos);
-        // when
-        response = makeRequestToReturnResponse(baseTodoUri.getPath());
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
-        assertThat(getResponseMessage()).isEqualTo(constructExpectedErrorMessage());
-    }
+    @Nested
+    class testDeleteTodo {
 
-    private String constructExpectedErrorMessage() {
-        return getMessageFromPropertiesFile(INVALID_TODO_PRESENT_IN_RETURN_LIST_MSG_KEY)
-                +" "+getMessageFromPropertiesFile(TODO_ID_ERROR_MSG_PREFIX_KEY)
-                +getMessageFromPropertiesFile(NULL_FIELD_ERROR_MSG_KEY);
-    }
+        @Test
+        public void whenValidIdPassedThen204Status() {
+            // given
+            mockTodoDaoDeleteByIdMethodCall(expectedTodo.getId());
+            // when
+            makeDeleteRequest(uriWithId.getPath());
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.NO_CONTENT_204);
+        }
 
-    private List<Todo> createListOfSingleInvalidTodo() {
-        invalidTodo = copyCreateNewTodoWithNullId();
-        return Collections.singletonList(invalidTodo);
-    }
+        private void mockTodoDaoDeleteByIdMethodCall(UUID id) {
+            when(MOCK_TODO_DAO.findById(id)).thenReturn(Optional.of(expectedTodo));
+        }
 
-    @Test
-    public void testGetTodoS_whenNullListReturnedFromDaoMethodThen500Error() {
-        //given/when
-        mockFindAllMethodCallToReturnExpectedListOfTodos(null);
-        // when
-        response = makeRequestToReturnResponse(baseTodoUri.getPath());
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
-        checkForAppropriateErrorMessage(NULL_LIST_OF_TODOS_RETURNED_ERROR_MSG_KEY);
-    }
+        private void makeDeleteRequest(String path) {
+            response = invokeForUri(path).delete();
+        }
 
-    private Response makeRequestToReturnResponse(String uri) {
-        return invokeForUri(uri).get();
-    }
+        @Test
+        public void whenEmptyIdPassedThen405Error() {
+            // given
+            uriWithId = buildRequestUriWithIdInPath("");
+            // when
+            makeDeleteRequest(uriWithId.getPath());
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED_405);
+        }
 
-    @Test
-    public void testGetTodoS_whenDaoMethodThrowsExceptionThen500Error() {
-        // given
-        when(MOCK_TODO_DAO.findAll()).thenThrow(UnableToExecuteStatementException.class);
-        // when
-        response = makeRequestToReturnResponse(baseTodoUri.getPath());
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
-        assertThat(getResponseMessage()).isEqualTo(UNABLE_TO_EXECUTE_STATEMENT_ERROR);
-    }
+        @Test
+        public void whenInvalidIdPassedThen404returned() {
+            // given
+            uriWithId = buildRequestUriWithIdInPath(INVALID_ID);
+            // when
+            makeDeleteRequest(uriWithId.getPath());
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.NOT_FOUND_404);
+        }
 
-
-
-
-
-    @Test
-    public void testDeleteTodo_whenValidIdPassedThen204Status() {
-        // given
-        mockTodoDaoDeleteByIdMethodCall(expectedTodo.getId());
-        // when
-        int returnStatusCode = makeRequestToDeleteTodoAndReturnStatus(uriWithId.getPath());
-        // then
-        assertThat(returnStatusCode).isEqualTo(HttpStatus.NO_CONTENT_204);
-    }
-
-    private void mockTodoDaoDeleteByIdMethodCall(UUID id) {
-        when(MOCK_TODO_DAO.findById(id)).thenReturn(Optional.of(expectedTodo));
-    }
-
-    private int makeRequestToDeleteTodoAndReturnStatus(String path) {
-        return makeDeleteTodoRequestWithPathAndReturnResponse(path).getStatusInfo().getStatusCode();
-    }
-
-    private Response makeDeleteTodoRequestWithPathAndReturnResponse(String path) {
-        return invokeForUri(path).delete();
-    }
-
-    @Test
-    public void testDeleteTodo_whenEmptyIdPassedThen405Error() {
-        // given
-        uriWithId = buildRequestUriWithIdInPath("");
-        // when
-        int returnStatusCode = makeRequestToDeleteTodoAndReturnStatus(uriWithId.getPath());
-        // then
-        assertThat(returnStatusCode).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED_405);
-    }
-
-    @Test
-    public void testDeleteTodo_whenInvalidIdPassedThen404returned() {
-        // given
-        uriWithId = buildRequestUriWithIdInPath(INVALID_ID);
-        // when
-        response = makeDeleteTodoRequestWithPathAndReturnResponse(uriWithId.getPath());
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND_404);
-    }
-
-    @Test
-    public void testDeleteTodo_whenDaoMethodThrowsExceptionThen500Error() {
-        // given
-        doThrow(UnableToExecuteStatementException.class).when(MOCK_TODO_DAO).deleteById(expectedTodo.getId());
-        // when
-        response = makeDeleteTodoRequestWithPathAndReturnResponse(uriWithId.getPath());
-        // then
-        assertThat(response.getStatusInfo().getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
-        assertThat(getResponseMessage()).isEqualTo(UNABLE_TO_EXECUTE_STATEMENT_ERROR);
+        @Test
+        public void whenDaoMethodThrowsExceptionThen500Error() {
+            // given
+            doThrow(UnableToExecuteStatementException.class).when(MOCK_TODO_DAO).deleteById(expectedTodo.getId());
+            // when
+            makeDeleteRequest(uriWithId.getPath());
+            // then
+            assertThat(responseStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR_500);
+            assertThat(getResponseMessage()).isEqualTo(UNABLE_TO_EXECUTE_STATEMENT_ERROR);
+        }
     }
 }

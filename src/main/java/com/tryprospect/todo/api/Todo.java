@@ -19,10 +19,12 @@ import com.tryprospect.todo.jackson.deserializer.TodoInstantDeserializer;
 import com.tryprospect.todo.jackson.serializer.NonOptionalInstantSerializer;
 import com.tryprospect.todo.jackson.serializer.OptionalInstantSerializer;
 
+import lombok.Builder;
 import lombok.Data;
 
 
 @Data
+@Builder
 public final class Todo {
 
   @NotNull(message = "{"+TODO_ID_ERROR_MSG_PREFIX_KEY+"}"+"{"+NULL_FIELD_ERROR_MSG_KEY+"}")

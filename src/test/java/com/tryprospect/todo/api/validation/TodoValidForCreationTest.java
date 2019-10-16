@@ -1,6 +1,6 @@
 package com.tryprospect.todo.api.validation;
 
-import static com.tryprospect.todo.utils.TestTodoCreator.*;
+import static com.tryprospect.todo.utils.TodoCreator.*;
 import static com.tryprospect.todo.validation.ValidationMessages.VALID_FOR_CREATE_DEFAULT_MSG_KEY;
 import static com.tryprospect.todo.validation.ValidationMessageHandler.getMessageFromPropertiesFile;
 import static org.assertj.core.api.Java6Assertions.assertThat;
@@ -32,7 +32,7 @@ public final class TodoValidForCreationTest extends CommonTodoTestMembers {
     @Test
     public void whenValidValuesReceivedExcludingDueDateThenValid() {
         // given/when
-        validTodo = copyCreateTodoForValidCreationExcludingDueDate();
+        validTodo = validForCreationWithoutDueDate();
         // then
         assertThat(CREATE_VALIDATOR.isValid(validTodo, constraintValidatorContext)).isTrue();
         assertThat(CREATE_VALIDATOR.getMessage()).isEmpty();
@@ -41,7 +41,7 @@ public final class TodoValidForCreationTest extends CommonTodoTestMembers {
     @Test
     public void whenValidValuesReceivedIncludingDueDateThenValid() {
         // given/when
-        validTodo = copyCreateTodoForValidCreationIncludingDueDate();
+        validTodo = validForCreationWithDueDate();
         // then
         assertThat(CREATE_VALIDATOR.isValid(validTodo, constraintValidatorContext)).isTrue();
         assertThat(CREATE_VALIDATOR.getMessage()).isEmpty();
@@ -50,7 +50,7 @@ public final class TodoValidForCreationTest extends CommonTodoTestMembers {
     @Test
     public void whenTodoHasNonNullIdThenInvalid() {
         // given/when
-        invalidTodo = copyCreateTodoForValidCreationButWithNonNullId();
+        invalidTodo = invalidForCreationWithNonNullId();
         // then
         assertInvalid();
     }
@@ -72,7 +72,7 @@ public final class TodoValidForCreationTest extends CommonTodoTestMembers {
     @Test
     public void whenTodoHasNonNullCreatedAtThenInvalid() {
         // given/when
-        invalidTodo = copyCreateTodoForCreationWithNonNullCreatedAt();
+        invalidTodo = invalidForCreationWithNonNullCreatedAt();
         // then
         assertInvalid();
     }
@@ -80,7 +80,7 @@ public final class TodoValidForCreationTest extends CommonTodoTestMembers {
     @Test
     public void whenTodoHasNonNullLastModifiedAtThenInvalid() {
         // given/when
-        invalidTodo = copyCreateTodoForCreationWithNonNullLastModifiedAt();
+        invalidTodo = invalidForCreationWithNonNullLastModifiedAt();
         // then
         assertInvalid();
     }
@@ -88,7 +88,7 @@ public final class TodoValidForCreationTest extends CommonTodoTestMembers {
     @Test
     public void whenAppropriateFieldsNullAndTextNullThenInvalid() {
         // given/when
-        invalidTodo = copyCreateTodoForCreationWithNullText();
+        invalidTodo = invalidForCreationWithNullText();
         // then
         assertInvalid();
     }
@@ -96,7 +96,7 @@ public final class TodoValidForCreationTest extends CommonTodoTestMembers {
     @Test
     public void whenRequiredNullFieldsAreReceivedAndTextEmptyThenInvalid() {
         // given/when
-        invalidTodo = copyCreateTodoForCreationWithEmptyText();
+        invalidTodo = invalidForCreationWithBlankText();
         // then
         assertInvalid();
     }
@@ -104,7 +104,7 @@ public final class TodoValidForCreationTest extends CommonTodoTestMembers {
     @Test
     public void whenRequiredNullFieldsAreReceivedAndIsCompletedIsNullThenInvalid() {
         // given/when
-        invalidTodo = copyCreateTodoForValidCreationButWithNullIsCompleted();
+        invalidTodo = invalidForCreateWithNullIsCompleted();
         // then
         assertInvalid();
     }
