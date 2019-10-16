@@ -3,6 +3,9 @@ package com.tryprospect.todo;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.tryprospect.todo.db.TodoDAO;
 import com.tryprospect.todo.container.StatusFilterFeature;
+import com.tryprospect.todo.exceptionmappers.ConstraintViolationExceptionMapper;
+import com.tryprospect.todo.exceptionmappers.JdbiExceptionMapper;
+import com.tryprospect.todo.exceptionmappers.TodoValidationExceptionMapper;
 import com.tryprospect.todo.lifecycle.ManagedFlywayMigration;
 import com.tryprospect.todo.resources.TodoResource;
 
@@ -57,6 +60,11 @@ public class TodoApplication extends Application<TodoConfiguration> {
 
         // Filters
         environment.jersey().register(StatusFilterFeature.class);
+
+        // Exception mappers
+        environment.jersey().register(ConstraintViolationExceptionMapper.class);
+        environment.jersey().register(TodoValidationExceptionMapper.class);
+        environment.jersey().register(JdbiExceptionMapper.class);
 
         // Misc TODO: what is this? and what is it for?
         environment.getObjectMapper().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
