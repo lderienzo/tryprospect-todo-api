@@ -1,32 +1,34 @@
 package com.tryprospect.todo.resources;
 
 
+import static com.tryprospect.todo.validation.ValidationMessageHandler.getMessageFromPropertiesFile;
 import static com.tryprospect.todo.validation.ValidationMessages.*;
 
 import com.tryprospect.todo.annotations.Status;
-import com.tryprospect.todo.annotations.TodoValidationSequence;
 import com.tryprospect.todo.annotations.ValidForUpdate;
 import com.tryprospect.todo.annotations.ValidateForCreation;
 import com.tryprospect.todo.api.Todo;
 import com.tryprospect.todo.db.TodoDAO;
-import com.tryprospect.todo.validation.ValidationMessages;
 
+import javax.validation.ConstraintViolation;
 import javax.validation.Valid;
+import javax.validation.Validation;
+import javax.validation.ValidationException;
+import javax.validation.Validator;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
-import org.hibernate.validator.constraints.NotBlank;
-
-import io.dropwizard.validation.Validated;
+import lombok.extern.slf4j.Slf4j;
 
 
 //TODO: BIG CHANGES
-// * create ValidForCreation annotation
 // * refactor unit tests to use one set of code for client api request building and sending. better way to do integraton test?
 // * Implement new feature using NLP to infer due date
+@Slf4j
 @Path("/todos")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
@@ -40,34 +42,53 @@ public class TodoResource {
   }
 
   @POST
-  @Valid
   @Status(Status.CREATED)
-  @NotNull(message = ValidationMessages.NULL_TODO_RETURNED_ERROR_MSG_KEY)
-  public Todo createTodo(@ValidateForCreation Todo newTodo) {
-    return todoDAO.insert(newTodo);
+  public @NotNull(message = "{"+NULL_TODO_RETURNED_ERROR_MSG_KEY+"}") @Valid Todo createTodo(@ValidateForCreation Todo todo) {
+    return todoDAO.insert(todo);
   }
 
   @PUT
   @Path("/{id}")
-  public void updateTodo(@Validated(TodoValidationSequence.class) @Valid Todo todo) {
+  public void updateTodo(@ValidForUpdate Todo todo) {
      todoDAO.update(todo);
-  }
-
-  @GET
-  @NotNull(message = NULL_LIST_OF_TODOS_RETURNED_ERROR_MSG_KEY)// TODO: Remove this. Add @Valid to return List<Todo>
-  public List<Todo> getTodos() {
-    return todoDAO.findAll();
-  }
-
-  @GET
-  @Path("/{id}")
-  public Optional<Todo> getTodo(@PathParam("id") UUID id) {
-    return todoDAO.findById(id);
   }
 
   @DELETE
   @Path("/{id}")
   public void deleteTodo(@PathParam("id") UUID id) {
     todoDAO.deleteById(id);
+  }
+
+  @GET
+  @Path("/{id}")
+  public @Valid Optional<Todo> getTodo(@PathParam("id") UUID id) {
+    return todoDAO.findById(id);
+  }
+
+  @GET
+  public List<Todo> getTodos() {
+      List<Todo> todos = todoDAO.findAll();
+      validateReturnTodos(todos);
+      return todos;
+  }
+
+  private void validateReturnTodos(List<Todo> todos) {
+    if (todos == null)
+      throw new ValidationException(NULL_LIST_OF_TODOS_RETURNED_ERROR_MSG_KEY);
+    Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+    for (Todo todo : todos) {
+      validateTodo(todo, validator);
+    }
+  }
+
+  private void validateTodo(Todo todo, Validator validator) {
+    Set<ConstraintViolation<Todo>> cv = validator.validate(todo);;
+    if (!cv.isEmpty()) {
+      throw new ValidationException(getMessageFromPropertiesFile(INVALID_TODO_PRESENT_IN_RETURN_LIST_MSG_KEY)+" "+getViolationMessage(cv));
+    }
+  }
+
+  private String getViolationMessage(Set<ConstraintViolation<Todo>> cv) {
+    return cv.stream().map(v -> v.getMessage()).collect(Collectors.toList()).get(0);
   }
 }

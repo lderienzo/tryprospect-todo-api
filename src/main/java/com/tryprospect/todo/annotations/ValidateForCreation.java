@@ -1,5 +1,6 @@
 package com.tryprospect.todo.annotations;
 
+import static com.tryprospect.todo.validation.ValidationMessages.VALID_FOR_CREATE_DEFAULT_MSG_KEY;
 import static java.lang.annotation.ElementType.PARAMETER;
 import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -20,28 +21,48 @@ import com.tryprospect.todo.api.Todo;
 @Constraint(validatedBy = ValidateForCreation.Validator.class)
 public @interface ValidateForCreation {
 
-    String message() default "{annotations.ValidForUpdate.message}";
+    String message() default "{"+VALID_FOR_CREATE_DEFAULT_MSG_KEY+"}";
     Class<?>[] groups() default {};
     Class<? extends Payload>[] payload() default {};
 
     class Validator implements ConstraintValidator<ValidateForCreation, Todo> {
+        private String potentialErrorMessage;
+        private String message;
 
         @Override
         public void initialize(ValidateForCreation constraintAnnotation) {
+            this.potentialErrorMessage = constraintAnnotation.message();
         }
 
         @Override
         public boolean isValid(Todo newTodo, ConstraintValidatorContext context) {
-            return whenIdCreatedAtAndLastModifiedAtAreNull(newTodo)
-                    && whenTextIsCompletedAndDueDateOptionalAreNotNullOrEmpty(newTodo);
+            if (validAccordingToBusinessRules(newTodo)) {
+                message = "";
+                return true;
+            }
+            else {
+                message = potentialErrorMessage;
+                return false;
+            }
         }
 
-        private boolean whenIdCreatedAtAndLastModifiedAtAreNull(Todo newTodo) {
-            return newTodo.getId() == null && newTodo.getCreatedAt() == null && newTodo.getLastModifiedAt() == null;
+        private boolean validAccordingToBusinessRules(Todo newTodo) {
+            return idCreatedAtAndLastModifiedAtAreNull(newTodo) &&
+                    valuesForTextAndIsCompletedArePresent(newTodo);
         }
 
-        private boolean whenTextIsCompletedAndDueDateOptionalAreNotNullOrEmpty(Todo newTodoToCheck) {
-            return !Strings.isNullOrEmpty(newTodoToCheck.getText()) && newTodoToCheck.getCompleted() != null && newTodoToCheck.getDueDate() != null;
+        private boolean idCreatedAtAndLastModifiedAtAreNull(Todo newTodo) {
+            return newTodo.getId() == null && newTodo.getCreatedAt() == null &&
+                    newTodo.getLastModifiedAt() == null;
+        }
+
+        private boolean valuesForTextAndIsCompletedArePresent(Todo newTodoToCheck) {
+            return !Strings.isNullOrEmpty(newTodoToCheck.getText()) &&
+                    newTodoToCheck.getCompleted() != null;
+        }
+
+        public String getMessage() {
+            return message;
         }
     }
 }

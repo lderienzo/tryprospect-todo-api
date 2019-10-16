@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Past;
 
 import org.hibernate.validator.constraints.NotEmpty;
 
@@ -14,8 +15,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.tryprospect.todo.annotations.PresentOrPast;
-import com.tryprospect.todo.annotations.ValidateAfterDefaultConstraints;
 import com.tryprospect.todo.jackson.deserializer.TodoInstantDeserializer;
 import com.tryprospect.todo.jackson.serializer.NonOptionalInstantSerializer;
 import com.tryprospect.todo.jackson.serializer.OptionalInstantSerializer;
@@ -26,31 +25,29 @@ import lombok.Data;
 @Data
 public final class Todo {
 
-  @NotNull(message = "{" + TODO_ID_ERROR_MSG_PREFIX + "}" + "{" + NULL_FIELD_ERROR_MSG_KEY + "}")
+  @NotNull(message = "{"+TODO_ID_ERROR_MSG_PREFIX_KEY+"}"+"{"+NULL_FIELD_ERROR_MSG_KEY+"}")
   private UUID id;
 
-  @NotEmpty(message = "{" + TODO_TEXT_ERROR_MSG_PREFIX + "}" + "{" + NULL_FIELD_ERROR_MSG_KEY + "}")
+  @NotEmpty(message = "{"+TODO_TEXT_ERROR_MSG_PREFIX_KEY+"}"+"{"+NULL_FIELD_ERROR_MSG_KEY+"}")
   private final String text;
 
-  @NotNull(message = "{" + TODO_IS_COMPLETED_ERROR_MSG_PREFIX + "}" + "{" + NULL_FIELD_ERROR_MSG_KEY + "}")
+  @NotNull(message = "{"+TODO_IS_COMPLETED_ERROR_MSG_PREFIX_KEY+"}"+"{"+NULL_FIELD_ERROR_MSG_KEY+"}")
   private final Boolean isCompleted;
 
-  @NotNull(message = "{" + TODO_CREATED_AT_ERROR_MSG_PREFIX + "}" + "{" + NULL_FIELD_ERROR_MSG_KEY + "}")
-  @PresentOrPast(message = "{" + TODO_CREATED_AT_ERROR_MSG_PREFIX + "}"
-          + "{" + PRESENT_OR_PAST_ERROR_MSG_KEY + "}", groups = {ValidateAfterDefaultConstraints.class})
+  @NotNull(message = "{"+TODO_CREATED_AT_ERROR_MSG_PREFIX_KEY+"}"+"{"+NULL_FIELD_ERROR_MSG_KEY+"}")
+  @Past(message = "{"+TODO_CREATED_AT_ERROR_MSG_PREFIX_KEY+"}"+"{"+PAST_DATE_ERROR_MSG_KEY+"}")
   @JsonProperty("created_at")
   @JsonDeserialize(using = TodoInstantDeserializer.class, as = Instant.class)
   @JsonSerialize(using = NonOptionalInstantSerializer.class)
   private final Instant createdAt;
 
-  @NotNull(message = "{" + TODO_LAST_MODIFIED_AT_ERROR_MSG_PREFIX + "}" + "{" + NULL_FIELD_ERROR_MSG_KEY + "}")
-//  @PastOrPresent
+  @NotNull(message = "{"+TODO_LAST_MODIFIED_AT_ERROR_MSG_PREFIX_KEY+"}"+"{"+NULL_FIELD_ERROR_MSG_KEY+"}")
+  @Past(message = "{"+TODO_LAST_MODIFIED_AT_ERROR_MSG_PREFIX_KEY+"}"+"{"+PAST_DATE_ERROR_MSG_KEY+"}")
   @JsonProperty("last_modified_at")
   @JsonDeserialize(using = TodoInstantDeserializer.class, as = Instant.class)
-  @JsonSerialize(using = NonOptionalInstantSerializer.class)
+  @JsonSerialize(using = NonOptionalInstantSerializer.class)  // TODO: fix deserializer/serializer classes
   private final Instant lastModifiedAt;
 
-//  @FutureOrPresent
   @JsonProperty("due_date")
   @JsonDeserialize(using = TodoInstantDeserializer.class, as = Instant.class)
   @JsonSerialize(using = NonOptionalInstantSerializer.class)
